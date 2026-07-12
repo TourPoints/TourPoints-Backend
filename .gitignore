@@ -8,5 +8,5 @@
 __pycache__/
 *.pyc
 
-# Base de datos local de desarrollo (si aplica)
+# Base de datos local de desarrollo
 *.db
