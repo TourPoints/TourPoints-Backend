@@ -1,0 +1,12 @@
+# Entorno virtual
+.venv/
+
+# Variables de entorno (Contienen credenciales secretas)
+.env
+
+# Caché de Python
+__pycache__/
+*.pyc
+
+# Base de datos local de desarrollo
+*.db
