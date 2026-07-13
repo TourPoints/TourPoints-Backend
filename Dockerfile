@@ -2,16 +2,15 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# dependencias del sistema que psycopg2 necesita para compilar
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# UID 1000 coincide con el usuario típico del host: evita que los
+# archivos que el contenedor escribe en el volumen de desarrollo
+# (__pycache__, migraciones generadas, etc.) queden root-owned.
+RUN useradd --uid 1000 --create-home appuser
+COPY --chown=appuser:appuser . .
+USER appuser
 
 EXPOSE 8000
 
