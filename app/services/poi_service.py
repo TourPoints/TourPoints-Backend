@@ -152,6 +152,15 @@ class PoiService:
         except Exception as exc:
             raise DBError(f"Get poi failed: {str(exc)}") from exc
 
+    def exists(self, poi_id: str) -> bool:
+        return self.repository.get_by_id(poi_id) is not None
+
+    def list_by_ids(self, ids: List[str]) -> List[PoiListItem]:
+        """Devuelve los POI de `ids` con el mismo shape resumido de GET /poi, preservando el orden de `ids`."""
+        rows = self.repository.get_by_ids(ids)
+        rows_by_id = {row.Poi.id: row for row in rows}
+        return [self._to_list_item(rows_by_id[i]) for i in ids if i in rows_by_id]
+
     def list_pois(self, skip: int, limit: int, page: int, is_admin: bool, **filters) -> PaginatedPoiResponse:
         try:
             if not is_admin:

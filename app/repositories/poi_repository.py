@@ -114,6 +114,11 @@ class PoiRepository(BaseRepository[Poi]):
     def get_detail(self, id: str):
         return self._with_aggregates().filter(Poi.id == id, Poi.deleted_at.is_(None)).first()
 
+    def get_by_ids(self, ids: List[str]):
+        if not ids:
+            return []
+        return self._with_aggregates().filter(Poi.id.in_(ids), Poi.deleted_at.is_(None)).all()
+
     def create(self, data: dict) -> Poi:
         lat = data.pop("lat")
         lng = data.pop("lng")
