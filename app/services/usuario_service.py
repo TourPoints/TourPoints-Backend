@@ -16,7 +16,7 @@ class UsuarioService:
             if self.repository.search_by_email(data.email):
                 raise KoreansavageError(f"Email {data.email} already exists")
 
-            user_data = data.model_dump(exclude={"password"})
+            user_data = data.model_dump(exclude={"password"}, exclude_none=True)
             user_data["password_hash"] = hash_password(data.password)
 
             user = self.repository.create(user_data)

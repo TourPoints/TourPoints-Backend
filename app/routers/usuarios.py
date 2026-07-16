@@ -104,6 +104,7 @@ def update_current_user_profile(
 ):
     """Actualiza el perfil del usuario autenticado."""
     update_data = user_data.model_dump(exclude_unset=True)
+    update_data.pop("rol_id", None)  # el rol solo puede cambiarlo un admin vía PATCH /users/{id}
     if "email" in update_data:
         existing_user = db.query(Usuario).filter(Usuario.email == update_data["email"]).first()
         if existing_user and existing_user.id != current_user.id:

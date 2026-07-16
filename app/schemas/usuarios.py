@@ -12,6 +12,7 @@ class UsuarioUpdate(BaseModel):
     foto_url: Optional[str] = None
     estado: Optional[str] = None
     configuracion: Optional[dict] = None
+    rol_id: Optional[int] = Field(None, description="Rol a asignar (solo admin puede definirlo)")
 
 
 class ChangePasswordRequest(BaseModel):
