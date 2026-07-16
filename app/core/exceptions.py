@@ -31,3 +31,17 @@ class DBError(HTTPException):
 
     def __init__(self, detail: str = "Error de base de datos"):
         super().__init__(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail)
+
+
+class PuntosInsuficientesError(HTTPException):
+    """El usuario no tiene saldo suficiente para canjear (409)."""
+
+    def __init__(self, detail: str = "Puntos insuficientes para canjear esta recompensa"):
+        super().__init__(status_code=status.HTTP_409_CONFLICT, detail=detail)
+
+
+class SinStockError(HTTPException):
+    """La recompensa no tiene stock disponible (409)."""
+
+    def __init__(self, detail: str = "La recompensa no tiene stock disponible"):
+        super().__init__(status_code=status.HTTP_409_CONFLICT, detail=detail)
