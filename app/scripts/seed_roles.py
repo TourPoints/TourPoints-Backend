@@ -1,38 +1,40 @@
-# Seed de roles iniciales para la base de datos
-from alembic.runtime.migration import Migrator
-from alembic.runtime.environment import EnvironmentContext
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import Session
-from app.models.rol import Rol
+"""Siembra los roles base (admin, usuario, establecimiento). Uso: python -m app.scripts.seed_roles"""
 import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
-# Obtener conexión a la base de datos desde .env
-DATABASE_URL = os.getenv('DATABASE_URL')
-engine = create_engine(DATABASE_URL)
+from app.models.usuario import Rol
+from app.database import Base
 
-# Función para ejecutar seed después de migraciones
-@event.listens_for(engine, 'connect')
-def set_sqlalchemy_event_listeners(conn, connect_args, options):
-    # Crear roles si no existen
-    with Session(bind=conn) as session:
-        if session.query(Rol).count() == 0:
-            roles = [
-                Rol(id=1, nombre='ADMIN'),
-                Rol(id=2, nombre='USUARIO'),
-                Rol(id=3, nombre='ESTABLECIMIENTO')
-            ]
-            session.add_all(roles)
+
+def get_database_url() -> str:
+    return os.getenv("DATABASE_URL") or os.getenv("DATABASE_URL_LOCAL")
+
+
+def seed_roles(database_url: str | None = None) -> None:
+    if not database_url:
+        database_url = get_database_url()
+    if not database_url:
+        raise RuntimeError("DATABASE_URL no está definida en el entorno")
+
+    engine = create_engine(database_url)
+    Base.metadata.create_all(bind=engine)  # no-op si el esquema ya está migrado
+
+    with Session(bind=engine) as session:
+        existing = {r.nombre.upper(): r for r in session.query(Rol).all()}
+
+        roles_to_create = []
+        for id_, name in ((1, "admin"), (2, "usuario"), (3, "establecimiento")):
+            if name.upper() not in existing:
+                roles_to_create.append(Rol(id=id_, nombre=name, descripcion=f"Rol {name}"))
+
+        if roles_to_create:
+            session.add_all(roles_to_create)
             session.commit()
-            session.expire_on_commit(roles)
+            print(f"Se crearon {len(roles_to_create)} roles: {[r.nombre for r in roles_to_create]}")
+        else:
+            print("Los roles ya existen. No se realizaron cambios.")
 
-if __name__ == '__main__':
-    # Ejecutar migración y seed
-    config = ContextConfig(
-        alembic_ini=os.getenv('ALEMBIC_INI', 'alembic.ini'),
-        sql_format=True
-    )
-    with engine.begin() as conn:
-        context = EnvironmentContext(config, conn)
-        migrator = Migrator(context)
-        migrator.run_migrations()
-        # El seed se ejecuta automáticamente al crear la conexión
+
+if __name__ == "__main__":
+    seed_roles()

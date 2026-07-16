@@ -1,20 +1,21 @@
 from fastapi import APIRouter, FastAPI
-from fastapi.openapi.docs import get_redoc_html
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.exceptions import KoreansavageError, RecordNotFoundError, DBError
-from app.core.middleware import JWTMiddleware
-from app.core.exception_handlers import register_exception_handlers
+from fastapi.openapi.docs import get_redoc_html
 
-# Import routers
-from app.routers import auth, poi, usuarios, recompensas, visitas
+from app.core.exception_handlers import register_exception_handlers
+from app.core.exceptions import DBError, KoreansavageError, RecordNotFoundError
+from app.core.middleware import JWTMiddleware
+from app.routers import auth, poi, recompensas, usuarios, visitas
+from os import getenv
+
+try:
+    from app.scripts.seed_roles import seed_roles
+except Exception:
+    seed_roles = None
 
 app = FastAPI(title="TourPoints API", redoc_url=None)
 
-# Middlewares
-app.add_middleware(
-    JWTMiddleware,
-    # JWT config will be added here if needed
-)
+app.add_middleware(JWTMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -23,20 +24,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register exception handlers
 register_exception_handlers(app)
 
-# API Routers
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_v1.include_router(poi.router, prefix="/poi", tags=["poi"])
-api_v1.include_router(usuarios.router, prefix="/usuarios", tags=["usuarios"])
-api_v1.include_router(visitas.router, prefix="/visitas", tags=["visitas"])
-api_v1.include_router(recompensas.router, prefix="/recompensas", tags=["recompensas"])
+api_v1.include_router(usuarios.router, prefix="/users", tags=["users"])
+api_v1.include_router(visitas.router, prefix="/visits", tags=["visits"])
+api_v1.include_router(recompensas.router, prefix="/rewards", tags=["rewards"])
 
 app.include_router(api_v1)
 
-# Redoc endpoint
+
 @app.get("/redoc", include_in_schema=False)
 def redoc_html():
     return get_redoc_html(
@@ -45,7 +44,18 @@ def redoc_html():
         redoc_js_url="https://cdn.jsdelivr.net/npm/redoc@2.5.3/bundles/redoc.standalone.js",
     )
 
-# Health check
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.on_event("startup")
+def maybe_seed_roles_on_startup():
+    """Siembra los roles base si SEED_ROLES=true (útil en entornos nuevos sin la tabla poblada)."""
+    if getenv("SEED_ROLES", "false").lower() in ("1", "true", "yes"):
+        if callable(seed_roles):
+            try:
+                seed_roles()
+            except Exception:
+                pass
