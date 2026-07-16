@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html
 
 from app.core.exception_handlers import register_exception_handlers
-from app.core.exceptions import DBError, KoreansavageError, RecordNotFoundError
 from app.core.middleware import JWTMiddleware
 from app.routers import auth, poi, recompensas, usuarios, visitas
 from os import getenv

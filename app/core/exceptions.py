@@ -12,11 +12,22 @@ class CredentialsException(HTTPException):
         )
 
 
-class KoreansavageError(HTTPException):
-    """Excepción personalizada para errores de negocio."""
+class InternalServiceError(HTTPException):
+    """Error inesperado durante la ejecución de un servicio."""
 
-    def __init__(self, detail: str, status_code: int = status.HTTP_400_BAD_REQUEST):
+    def __init__(
+        self,
+        detail: str = "Error interno del servicio",
+        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ):
         super().__init__(status_code=status_code, detail=detail)
+
+
+class ConflictError(HTTPException):
+    """El recurso solicitado entra en conflicto con el estado actual."""
+
+    def __init__(self, detail: str = "Conflicto con el estado actual"):
+        super().__init__(status_code=status.HTTP_409_CONFLICT, detail=detail)
 
 
 class RecordNotFoundError(HTTPException):

@@ -1,13 +1,16 @@
 from datetime import datetime, timedelta
+from hashlib import sha1
 from typing import List, Optional
 from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
     DBError,
+    InternalServiceError,
     PuntosInsuficientesError,
     RecordNotFoundError,
     SinStockError,
@@ -117,6 +120,20 @@ class RecompensasService:
         return _to_out(recompensa)
 
     def canjear(self, usuario_id: str, recompensa_id: str) -> CanjeOut:
+        """Canjea una recompensa y evita dejar la sesión en estado abortado."""
+        try:
+            return self._canjear(usuario_id, recompensa_id)
+        except HTTPException:
+            # Los errores de negocio ya tienen un código HTTP y no deben
+            # convertirse en un 400 genérico.
+            raise
+        except Exception as exc:
+            self.db.rollback()
+            raise InternalServiceError(
+                f"Error en el proceso de canje: {str(exc)}"
+            ) from exc
+
+    def _canjear(self, usuario_id: str, recompensa_id: str) -> CanjeOut:
         """Canjea una recompensa por puntos. Orden estricto (no reordenar):
         lock por usuario_id -> recompensa con lock -> validar saldo ->
         QR/expira -> insertar canje -> insertar movimiento negativo -> commit.
@@ -144,9 +161,15 @@ class RecompensasService:
 
         if dialect == "postgresql":
             try:
+                # PostgreSQL recibe dos claves INTEGER (int4). Se usan los
+                # primeros 64 bits del SHA-1 y se interpretan con signo para
+                # no invocar por accidente una sobrecarga bigint inexistente.
+                uid_hash = sha1(str(usuario_id).encode()).digest()
+                key1 = int.from_bytes(uid_hash[:4], byteorder="big", signed=True)
+                key2 = int.from_bytes(uid_hash[4:8], byteorder="big", signed=True)
                 self.db.execute(
-                    text("SELECT pg_advisory_xact_lock(hashtext(:uid::text))"),
-                    {"uid": str(usuario_id)},
+                    text("SELECT pg_advisory_xact_lock(:key1, :key2)"),
+                    {"key1": key1, "key2": key2},
                 )
             except Exception as exc:
                 # Solo traducir a DBError si realmente falló la adquisición del

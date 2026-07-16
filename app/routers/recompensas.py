@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple, Tuple
+from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -6,8 +6,6 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_admin_user, get_current_user, get_current_user_con_flag_admin
 from app.database import get_db
 from app.models.usuario import Usuario
-from app.repositories.puntos_repository import PuntosRepository
-from app.repositories.recompensa_repository import RecompensaRepository
 from app.schemas.gamificacion import CanjeOut, RecompensaCreate, RecompensaOut, RecompensaUpdate
 from app.services.recompensas_service import RecompensasService
 
@@ -15,8 +13,9 @@ router = APIRouter(tags=["rewards"])
 
 
 def get_recompensas_service(db: Session = Depends(get_db)) -> RecompensasService:
-    repo = RecompensaRepository(db)
-    return RecompensasService(repo)
+    # RecompensasService inyecta una Session (construye sus propios repos
+    # internamente) — no un repo suelto. Pasarle `repo` rompe el __init__.
+    return RecompensasService(db)
 
 
 @router.post("", response_model=RecompensaOut, status_code=status.HTTP_201_CREATED)
