@@ -75,6 +75,26 @@ class Poi(Base):
     deleted_at = Column(TIMESTAMP(timezone=True))
 
 
+class PoiModeracionLog(Base):
+    """Auditoría de cada cambio de estado de un POI: quién, cuándo, de qué a qué y por qué.
+
+    Registra tanto transiciones disparadas por el dueño (enviar a revisión, reintentar
+    tras rechazo) como por un ADMIN (aprobar/rechazar/activar/inactivar) — no se borra,
+    es append-only, igual que poi_relaciones.
+    """
+
+    __tablename__ = "poi_moderaciones"
+    __table_args__ = (Index("idx_poi_moderaciones_poi", "poi_id"),)
+
+    id = Column(BigInteger, primary_key=True)
+    poi_id = Column(UUID(as_uuid=True), ForeignKey("poi.id", ondelete="CASCADE"), nullable=False)
+    usuario_id = Column(UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=False)
+    estado_anterior: Mapped[PoiEstado] = mapped_column(poi_estado_enum, nullable=False)
+    estado_nuevo: Mapped[PoiEstado] = mapped_column(poi_estado_enum, nullable=False)
+    motivo = Column(Text)
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
+
+
 class TipoRelacionPoi(Base):
     __tablename__ = "tipos_relacion_poi"
 
