@@ -8,7 +8,7 @@ class UsuarioBase(BaseModel):
     """Esquema base con campos comunes de usuario"""
     nombre: str = Field(..., min_length=1, max_length=50)
     apellido: str = Field(..., min_length=1, max_length=50)
-    email: EmailStr  # Validación automática de email
+    email: EmailStr
     telefono: Optional[str] = Field(None, max_length=20)
 
 
@@ -44,6 +44,16 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
-class TokenData(BaseModel):
-    """Esquema para datos dentro del token"""
-    user_id: str | None = None
+class UsuarioProfileResponse(BaseModel):
+    """Esquema simplificado para GET /me"""
+    id: UUID
+    nombre: str
+    apellido: str
+    email: str
+    telefono: Optional[str]
+    foto_url: Optional[str]
+    estado: str
+    rol_id: int
+    
+    class Config:
+        from_attributes = True

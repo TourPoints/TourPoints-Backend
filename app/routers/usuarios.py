@@ -1,167 +1,190 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
 from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.auth.dependencies import get_admin_user, get_current_user
+from app.auth.security import hash_password, verify_password
 from app.database import get_db
-from app.repositories.usuario_repository import UsuarioRepository
-from app.services.usuario_service import UsuarioService
-from app.schemas.usuario import UsuarioCreate, UsuarioResponse, UsuarioLogin, Token
-from app.schemas.usuarios import UsuarioUpdate
-from app.auth.dependencies import get_current_user
 from app.models.usuario import Usuario
+from app.repositories.usuario_repository import UsuarioRepository
+from app.schemas.usuario import UsuarioCreate, UsuarioResponse
+from app.schemas.usuarios import ChangePasswordRequest, UsuarioUpdate
+from app.services.usuario_service import UsuarioService
 
-router = APIRouter()
+router = APIRouter(tags=["users"])
 
-def get_usuario_service(db: Session = Depends(get_db)) -> UsuarioService:
+
+def get_user_service(db: Session = Depends(get_db)) -> UsuarioService:
     repository = UsuarioRepository(db)
     return UsuarioService(repository)
 
 
 @router.post("", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
-def crear_usuario(
-    usuario_data: UsuarioCreate,
-    service: UsuarioService = Depends(get_usuario_service)
+def create_user(
+    user_data: UsuarioCreate,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
 ):
-    """
-    Crear un nuevo usuario
-
-    - **nombre**: Nombre del usuario (1-50 caracteres)
-    - **apellido**: Apellido del usuario (1-50 caracteres)
-    - **email**: Email válido y único
-    - **telefono**: Teléfono opcional (máx 20 caracteres)
-    - **password**: Contraseña (mínimo 8 caracteres)
-    """
-    return service.create_user(usuario_data)
+    """Crea un nuevo usuario (solo administradores)."""
+    return service.create_user(user_data)
 
 
 @router.get("", response_model=List[UsuarioResponse])
-def listar_usuarios(
+def list_users(
     skip: int = Query(0, ge=0, description="Número de registros a saltar"),
     limit: int = Query(100, ge=1, le=100, description="Límite de registros por página"),
-    nombre: Optional[str] = Query(None, description="Filtrar por nombre"),
-    apellido: Optional[str] = Query(None, description="Filtrar por apellido"),
+    name: Optional[str] = Query(None, description="Filtrar por nombre"),
+    surname: Optional[str] = Query(None, description="Filtrar por apellido"),
     email: Optional[str] = Query(None, description="Filtrar por email"),
     estado: Optional[str] = Query(None, description="Filtrar por estado"),
     rol_id: Optional[int] = Query(None, description="Filtrar por rol"),
     include_deleted: bool = Query(False, description="Incluir usuarios eliminados"),
-    service: UsuarioService = Depends(get_usuario_service)
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
 ):
-    """
-    Listar usuarios con paginación y filtros opcionales
-
-    - **skip**: Número de registros a saltar (paginación)
-    - **limit**: Límite de registros por página (máx 100)
-    - **nombre**: Filtrar por nombre (búsqueda parcial)
-    - **apellido**: Filtrar por apellido (búsqueda parcial)
-    - **email**: Filtrar por email (búsqueda parcial)
-    - **estado**: Filtrar por estado (ACTIVO, SUSPENDIDO, ELIMINADO)
-    - **rol_id**: Filtrar por ID de rol
-    - **include_deleted**: Incluir usuarios eliminados (soft delete)
-    """
+    """Lista usuarios con paginación y filtros opcionales."""
     filters = {}
-    if nombre:
-        filters['nombre'] = nombre
-    if apellido:
-        filters['apellido'] = apellido
+    if name:
+        filters["nombre"] = name
+    if surname:
+        filters["apellido"] = surname
     if email:
-        filters['email'] = email
+        filters["email"] = email
     if estado:
-        filters['estado'] = estado
+        filters["estado"] = estado
     if rol_id:
-        filters['rol_id'] = rol_id
+        filters["rol_id"] = rol_id
     if include_deleted:
-        filters['include_deleted'] = True
+        filters["include_deleted"] = True
 
     return service.list_users(skip=skip, limit=limit, **filters)
 
 
 @router.get("/count", response_model=int)
-def contar_usuarios(
-    nombre: Optional[str] = Query(None),
-    apellido: Optional[str] = Query(None),
+def count_users(
+    name: Optional[str] = Query(None),
+    surname: Optional[str] = Query(None),
     email: Optional[str] = Query(None),
     estado: Optional[str] = Query(None),
     rol_id: Optional[int] = Query(None),
     include_deleted: bool = Query(False),
-    service: UsuarioService = Depends(get_usuario_service)
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
 ):
-    """
-    Contar total de usuarios con filtros opcionales
-    """
+    """Cuenta los usuarios con filtros opcionales."""
     filters = {}
-    if nombre:
-        filters['nombre'] = nombre
-    if apellido:
-        filters['apellido'] = apellido
+    if name:
+        filters["nombre"] = name
+    if surname:
+        filters["apellido"] = surname
     if email:
-        filters['email'] = email
+        filters["email"] = email
     if estado:
-        filters['estado'] = estado
+        filters["estado"] = estado
     if rol_id:
-        filters['rol_id'] = rol_id
+        filters["rol_id"] = rol_id
     if include_deleted:
-        filters['include_deleted'] = True
+        filters["include_deleted"] = True
 
     return service.count_users(**filters)
 
 
-@router.get("/{usuario_id}", response_model=UsuarioResponse)
-def obtener_usuario(
-    usuario_id: str,
-    service: UsuarioService = Depends(get_usuario_service)
+@router.get("/me", response_model=UsuarioResponse)
+def get_current_user_profile(current_user: Usuario = Depends(get_current_user)):
+    """Devuelve el perfil del usuario autenticado."""
+    return current_user
+
+
+@router.patch("/me", response_model=UsuarioResponse)
+def update_current_user_profile(
+    user_data: UsuarioUpdate,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """
-    Obtener un usuario por su ID
-    """
-    return service.get_user(usuario_id)
+    """Actualiza el perfil del usuario autenticado."""
+    update_data = user_data.model_dump(exclude_unset=True)
+    if "email" in update_data:
+        existing_user = db.query(Usuario).filter(Usuario.email == update_data["email"]).first()
+        if existing_user and existing_user.id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El email ya está registrado")
+
+    if "password" in update_data:
+        update_data["password_hash"] = hash_password(update_data["password"])
+        del update_data["password"]
+
+    for field, value in update_data.items():
+        if hasattr(current_user, field):
+            setattr(current_user, field, value)
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
 
 
-@router.patch("/{usuario_id}", response_model=UsuarioResponse)
-def actualizar_usuario(
-    usuario_id: str,
-    usuario_data: UsuarioUpdate,
-    service: UsuarioService = Depends(get_usuario_service)
+@router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_current_user_password(
+    password_data: ChangePasswordRequest,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """
-    Actualizar un usuario existente (actualización parcial)
+    """Cambia la contraseña del usuario autenticado."""
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña actual es incorrecta")
 
-    Todos los campos son opcionales. Solo se actualizarán los campos proporcionados.
-    """
-    return service.update_user(usuario_id, usuario_data)
-
-
-@router.delete("/{usuario_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_usuario(
-    usuario_id: str,
-    soft: bool = Query(True, description="Eliminación suave (true) o permanente (false)"),
-    service: UsuarioService = Depends(get_usuario_service)
-):
-    """
-    Eliminar un usuario
-
-    - **soft=true** (por defecto): Marca el usuario como eliminado (soft delete)
-    - **soft=false**: Elimina permanentemente el usuario de la base de datos
-    """
-    service.delete_user(usuario_id, soft=soft)
+    current_user.password_hash = hash_password(password_data.new_password)
+    db.commit()
     return None
 
 
-@router.post("/{usuario_id}/activar", response_model=UsuarioResponse)
-def activar_usuario(
-    usuario_id: str,
-    service: UsuarioService = Depends(get_usuario_service)
+@router.post("/{user_id}/activate", response_model=UsuarioResponse)
+def activate_user(
+    user_id: str,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
 ):
-    """
-    Activar un usuario suspendido o eliminado
-    """
-    return service.activate_user(usuario_id)
+    """Activa un usuario suspendido o eliminado."""
+    return service.activate_user(user_id)
 
 
-@router.post("/{usuario_id}/suspender", response_model=UsuarioResponse)
-def suspender_usuario(
-    usuario_id: str,
-    service: UsuarioService = Depends(get_usuario_service)
+@router.post("/{user_id}/suspend", response_model=UsuarioResponse)
+def suspend_user(
+    user_id: str,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
 ):
-    """
-    Suspender un usuario activo
-    """
-    return service.suspend_user(usuario_id)
+    """Suspende un usuario activo."""
+    return service.suspend_user(user_id)
+
+
+@router.get("/{user_id}", response_model=UsuarioResponse)
+def get_user(
+    user_id: str,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Obtiene un usuario por su ID."""
+    return service.get_user(user_id)
+
+
+@router.patch("/{user_id}", response_model=UsuarioResponse)
+def update_user(
+    user_id: str,
+    user_data: UsuarioUpdate,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Actualiza un usuario existente (actualización parcial)."""
+    return service.update_user(user_id, user_data)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: str,
+    soft: bool = Query(True, description="Eliminación suave (true) o permanente (false)"),
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Elimina un usuario (soft delete por defecto)."""
+    service.delete_user(user_id, soft=soft)
+    return None

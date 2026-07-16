@@ -1,6 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
-from datetime import datetime
 
 
 class UsuarioUpdate(BaseModel):
@@ -13,3 +12,9 @@ class UsuarioUpdate(BaseModel):
     foto_url: Optional[str] = None
     estado: Optional[str] = None
     configuracion: Optional[dict] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    """Esquema para cambio de contraseña del usuario autenticado"""
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=100)

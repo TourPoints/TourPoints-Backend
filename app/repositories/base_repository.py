@@ -1,4 +1,3 @@
-#️ ⚙️ Repositorio base para operaciones CRUD comunes
 from typing import Generic, TypeVar, Type, List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound, StatementError
