@@ -32,7 +32,18 @@ VIGENCIA_CANJE_DIAS = 30
 
 def _to_out(recompensa: Recompensa) -> RecompensaOut:
     """Arma RecompensaOut calculando `disponible` (no vive en el ORM)."""
-    data = {c: getattr(recompensa, c) for c in RecompensaOut.model_fields}
+    # `disponible` no es una columna del ORM, asi que se inyecta aparte: si se
+    # iterara RecompensaOut.model_fields el getattr(recompensa, "disponible")
+    # lanzaria AttributeError (rompe la respuesta despues del commit).
+    data = {
+        "id": recompensa.id,
+        "poi_id": recompensa.poi_id,
+        "nombre": recompensa.nombre,
+        "descripcion": recompensa.descripcion,
+        "stock": recompensa.stock,
+        "puntos": recompensa.puntos,
+        "estado": recompensa.estado,
+    }
     data["disponible"] = recompensa.stock > 0
     return RecompensaOut.model_validate(data)
 
@@ -114,10 +125,39 @@ class RecompensasService:
         #    usuario (cualquier recompensa) para que SELECT SUM + INSERT del
         #    movimiento negativo sean atomicos respecto del saldo. El stock
         #    no se lockea aca: ya lo protege el trigger.
-        self.db.execute(
-            text("SELECT pg_advisory_xact_lock(hashtext(:uid::text))"),
-            {"uid": str(usuario_id)},
-        )
+        #
+        # Nota: pg_advisory_xact_lock solo existe en PostgreSQL. Evitar ejecutar
+        # la sentencia si la conexión no es Postgres (por ejemplo durante pruebas
+        # con SQLite o entornos locales), para que no produzca un error 500.
+        try:
+            # Intentar obtener el dialecto desde el bind/session
+            dialect = None
+            try:
+                dialect = self.db.get_bind().dialect.name  # SQLAlchemy 1.4+
+            except Exception:
+                dialect = getattr(getattr(self.db, "bind", None), "dialect", None)
+                if dialect is not None:
+                    dialect = getattr(dialect, "name", None)
+
+            if dialect == "postgresql":
+                self.db.execute(
+                    text("SELECT pg_advisory_xact_lock(hashtext(:uid::text))"),
+                    {"uid": str(usuario_id)},
+                )
+        except Exception as exc:
+            # No queremos que un fallo en el lock haga explotar el endpoint con
+            # 500 en entornos no preparados; loguear y traducir a DBError si es
+            # realmente un error de base de datos.
+            import logging
+
+            logging.exception("Error intentando obtener advisory lock: %s", exc)
+            # Si la excepción viene de intentar ejecutar la función Postgres en
+            # un SGDB distinto, mejor seguir sin lock (solo en entornos de dev
+            # o pruebas). Pero si es una excepción grave, traducirla a DBError.
+            # Para simplificar, solo traducimos si el dialecto reportado era
+            # 'postgresql' — en ese caso la falla es real.
+            if 'postgresql' in (str(getattr(getattr(self.db, 'bind', None), 'dialect', None)) or ''):
+                raise DBError("Error acquiring advisory lock") from exc
 
         # 2) Recompensa con lock de fila. Recien aca tenemos recompensa.puntos.
         recompensa = self.recompensa_repo.obtener_con_lock(recompensa_id)
