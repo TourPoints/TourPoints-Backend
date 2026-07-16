@@ -5,7 +5,7 @@ from fastapi.openapi.docs import get_redoc_html
 from app.core.exception_handlers import register_exception_handlers
 from app.core.exceptions import DBError, KoreansavageError, RecordNotFoundError
 from app.core.middleware import JWTMiddleware
-from app.routers import auth, poi, recompensas, usuarios, visitas
+from app.routers import auth, catalogos, poi, recompensas, usuarios, visitas
 from os import getenv
 
 try:
@@ -28,6 +28,7 @@ register_exception_handlers(app)
 
 api_v1 = APIRouter(prefix="/api/v1")
 api_v1.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_v1.include_router(catalogos.router)
 api_v1.include_router(poi.router, prefix="/poi", tags=["poi"])
 api_v1.include_router(usuarios.router, prefix="/users", tags=["users"])
 api_v1.include_router(visitas.router, prefix="/visits", tags=["visits"])

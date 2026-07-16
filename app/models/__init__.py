@@ -16,7 +16,7 @@ from app.models.gamificacion import (
 )
 from app.models.ia import ConversacionIa
 from app.models.movimiento_puntos import MovimientoPuntos
-from app.models.poi import CategoriaPoi, Poi, PoiRelacion, TipoRelacionPoi
+from app.models.poi import CategoriaPoi, Poi, PoiModeracionLog, PoiRelacion, TipoRelacionPoi
 from app.models.social import Calificacion, Comentario, Favorito, ImagenPoi
 from app.models.ubicacion import Ciudad, Departamento, Pais
 from app.models.usuario import Rol, Usuario
@@ -41,6 +41,7 @@ __all__ = [
     "MovimientoPuntos",
     "CategoriaPoi",
     "Poi",
+    "PoiModeracionLog",
     "PoiRelacion",
     "TipoRelacionPoi",
     "Calificacion",
