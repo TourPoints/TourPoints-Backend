@@ -2,7 +2,7 @@ from typing import Generic, TypeVar, Type, List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound, StatementError
 import sqlalchemy
-from app.core.exceptions import KoreansavageError, RecordNotFoundError, DBError
+from app.core.exceptions import RecordNotFoundError, DBError
 
 ModelT = TypeVar('ModelT')
 

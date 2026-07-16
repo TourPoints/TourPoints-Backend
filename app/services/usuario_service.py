@@ -1,7 +1,7 @@
 from typing import List
 
 from app.auth.security import hash_password
-from app.core.exceptions import DBError, KoreansavageError, RecordNotFoundError
+from app.core.exceptions import ConflictError, DBError, RecordNotFoundError
 from app.repositories.usuario_repository import UsuarioRepository
 from app.schemas.usuario import UsuarioCreate, UsuarioResponse
 from app.schemas.usuarios import UsuarioUpdate
@@ -14,14 +14,14 @@ class UsuarioService:
     def create_user(self, data: UsuarioCreate) -> UsuarioResponse:
         try:
             if self.repository.search_by_email(data.email):
-                raise KoreansavageError(f"Email {data.email} already exists")
+                raise ConflictError(f"Email {data.email} already exists")
 
             user_data = data.model_dump(exclude={"password"}, exclude_none=True)
             user_data["password_hash"] = hash_password(data.password)
 
             user = self.repository.create(user_data)
             return UsuarioResponse.model_validate(user)
-        except KoreansavageError:
+        except ConflictError:
             raise
         except Exception as exc:
             raise DBError(f"User creation failed: {str(exc)}") from exc
@@ -45,7 +45,7 @@ class UsuarioService:
 
             update_data = data.model_dump(exclude_unset=True)
             if "email" in update_data and self.repository.search_by_email(update_data["email"]):
-                raise KoreansavageError(f"Email {update_data['email']} already exists")
+                raise ConflictError(f"Email {update_data['email']} already exists")
 
             if "password" in update_data:
                 update_data["password_hash"] = hash_password(update_data["password"])
@@ -53,7 +53,7 @@ class UsuarioService:
 
             updated_user = self.repository.update(user_id, update_data)
             return UsuarioResponse.model_validate(updated_user)
-        except KoreansavageError:
+        except ConflictError:
             raise
         except RecordNotFoundError:
             raise

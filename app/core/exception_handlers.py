@@ -2,20 +2,20 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
-from app.core.exceptions import KoreansavageError, RecordNotFoundError, DBError
+from app.core.exceptions import InternalServiceError, RecordNotFoundError, DBError
 import logging
 
 class BaseExceptionHandler:
     def handle(self, request: Request, exc: Exception) -> JSONResponse:
         raise NotImplementedError
 
-class KoreansavageErrorHandler(BaseExceptionHandler):
-    def handle(self, request: Request, exc: KoreansavageError) -> JSONResponse:
-        logging.error(f"KoreansavageError: {exc}")
+class InternalServiceErrorHandler(BaseExceptionHandler):
+    def handle(self, request: Request, exc: InternalServiceError) -> JSONResponse:
+        logging.exception("InternalServiceError: %s", exc)
         return JSONResponse(
-            status_code=400,
+            status_code=500,
             content={
-                "detail": str(exc)
+                "detail": "Error interno del servicio"
             }
         )
 
@@ -41,6 +41,6 @@ class DBErrorHandler(BaseExceptionHandler):
         )
 
 def register_exception_handlers(router: APIRouter):
-    router.add_exception_handler(KoreansavageError, KoreansavageErrorHandler().handle)
+    router.add_exception_handler(InternalServiceError, InternalServiceErrorHandler().handle)
     router.add_exception_handler(RecordNotFoundError, RecordNotFoundErrorHandler().handle)
     router.add_exception_handler(DBError, DBErrorHandler().handle)
