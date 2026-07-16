@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 
-from app.core.exceptions import DBError, KoreansavageError, RecordNotFoundError
+from app.core.exceptions import ConflictError, DBError, RecordNotFoundError
 from app.models.usuario import Usuario
 from app.repositories.social_repository import SocialRepository
 from app.schemas.poi import PaginatedPoiResponse
@@ -117,12 +117,12 @@ class SocialService:
             if not comentario:
                 raise RecordNotFoundError(f"Comentario with id {comentario_id} not found")
             if data.estado not in VALID_COMENTARIO_ESTADOS:
-                raise KoreansavageError(f"Estado inválido: {data.estado} (usa APROBADO o RECHAZADO)")
+                raise ConflictError(f"Estado inválido: {data.estado} (usa APROBADO o RECHAZADO)")
 
             updated = self.repository.moderar_comentario(comentario_id, data.estado)
             usuario = self.repository.get_usuario(updated.usuario_id)
             return self._to_comentario_out(updated, usuario)
-        except (KoreansavageError, RecordNotFoundError):
+        except (ConflictError, RecordNotFoundError):
             raise
         except Exception as exc:
             raise DBError(f"Moderar comentario failed: {str(exc)}") from exc
@@ -151,11 +151,11 @@ class SocialService:
             if not self.poi_service.exists(poi_id):
                 raise RecordNotFoundError(f"Poi with id {poi_id} not found")
             if self.repository.is_favorito(current_user.id, poi_id):
-                raise KoreansavageError("Este POI ya está en tus favoritos")
+                raise ConflictError("Este POI ya está en tus favoritos")
 
             favorito = self.repository.add_favorito(current_user.id, poi_id)
             return FavoritoOut.model_validate(favorito)
-        except (KoreansavageError, RecordNotFoundError):
+        except (ConflictError, RecordNotFoundError):
             raise
         except Exception as exc:
             raise DBError(f"Add favorito failed: {str(exc)}") from exc

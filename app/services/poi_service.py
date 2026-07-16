@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from fastapi import HTTPException, UploadFile, status
 
-from app.core.exceptions import DBError, KoreansavageError, RecordNotFoundError
+from app.core.exceptions import ConflictError, DBError, RecordNotFoundError
 from app.models.enums import PoiEstado, PoiFuente
 from app.models.poi import Poi
 from app.models.usuario import Usuario
@@ -128,7 +128,7 @@ class PoiService:
 
             poi = self.repository.create(poi_data)
             return self.get_poi(str(poi.id), current_user, is_admin=True)
-        except KoreansavageError:
+        except ConflictError:
             raise
         except Exception as exc:
             raise DBError(f"Poi creation failed: {str(exc)}") from exc
@@ -203,7 +203,7 @@ class PoiService:
             self._ensure_owner_or_admin(poi, current_user, is_admin)
 
             if poi.estado != PoiEstado.BORRADOR.value:
-                raise KoreansavageError(
+                raise ConflictError(
                     f"Solo un POI en estado BORRADOR puede enviarse a revisión (estado actual: {poi.estado})"
                 )
 
@@ -226,12 +226,12 @@ class PoiService:
             try:
                 nuevo_estado = PoiEstado(data.estado)
             except ValueError as exc:
-                raise KoreansavageError(f"Estado inválido: {data.estado}") from exc
+                raise ConflictError(f"Estado inválido: {data.estado}") from exc
 
             actual_estado = PoiEstado(poi.estado)
             permitidos = VALID_MODERATION_TRANSITIONS.get(actual_estado, set())
             if nuevo_estado not in permitidos:
-                raise KoreansavageError(f"Transición no permitida: {actual_estado.value} -> {nuevo_estado.value}")
+                raise ConflictError(f"Transición no permitida: {actual_estado.value} -> {nuevo_estado.value}")
 
             self.repository.update(poi_id, {"estado": nuevo_estado.value})
             self.repository.log_transition(
@@ -256,7 +256,7 @@ class PoiService:
             self._ensure_owner_or_admin(poi, current_user, is_admin)
 
             if poi.estado != PoiEstado.RECHAZADO.value:
-                raise KoreansavageError(
+                raise ConflictError(
                     f"Solo un POI RECHAZADO puede reabrirse a BORRADOR (estado actual: {poi.estado})"
                 )
 
@@ -309,7 +309,7 @@ class PoiService:
             self._ensure_owner_or_admin(poi, current_user, is_admin)
 
             if file.content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
-                raise KoreansavageError("Formato de imagen no soportado (usa JPEG, PNG o WEBP)")
+                raise HTTPException(status_code=422, detail="Formato de imagen no soportado (usa JPEG, PNG o WEBP)")
 
             upload_result = upload_poi_imagen(file.file, poi_id=str(poi_id))
             orden = self.repository.next_imagen_orden(poi_id)
