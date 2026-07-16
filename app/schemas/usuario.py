@@ -15,6 +15,7 @@ class UsuarioBase(BaseModel):
 class UsuarioCreate(UsuarioBase):
     """Esquema para creación de usuario (registro)"""
     password: str = Field(..., min_length=8, max_length=100)
+    rol_id: Optional[int] = Field(None, description="Rol a asignar (solo admin puede definirlo)")
 
 
 class UsuarioResponse(UsuarioBase):
@@ -42,18 +43,3 @@ class Token(BaseModel):
     """Esquema para respuesta de token"""
     access_token: str
     token_type: str = "bearer"
-
-
-class UsuarioProfileResponse(BaseModel):
-    """Esquema simplificado para GET /me"""
-    id: UUID
-    nombre: str
-    apellido: str
-    email: str
-    telefono: Optional[str]
-    foto_url: Optional[str]
-    estado: str
-    rol_id: int
-    
-    class Config:
-        from_attributes = True

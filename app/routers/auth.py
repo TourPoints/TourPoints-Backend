@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user
 from app.auth.security import authenticate_user, create_access_token, hash_password
 from app.core.exceptions import CredentialsException
 from app.database import get_db
 from app.models.usuario import Rol, Usuario
-from app.schemas.usuario import Token, UsuarioCreate, UsuarioLogin, UsuarioResponse, UsuarioProfileResponse
+from app.schemas.usuario import Token, UsuarioCreate, UsuarioLogin, UsuarioResponse
 
 router = APIRouter(tags=["auth"])
 
@@ -23,7 +22,7 @@ def register_user(usuario: UsuarioCreate, db: Session = Depends(get_db)):
     role_id = role.id if role else 2
 
     db_user = Usuario(
-        **usuario.model_dump(exclude={"password"}),
+        **usuario.model_dump(exclude={"password", "rol_id"}),
         password_hash=hashed_password,
         rol_id=role_id,
     )
@@ -47,9 +46,3 @@ def login_user(usuario: UsuarioLogin, db: Session = Depends(get_db)):
         data={"sub": str(db_user.id), "role": "admin" if db_user.rol_id == 1 else "user", "status": db_user.estado}
     )
     return {"access_token": access_token, "token_type": "bearer"}
-
-
-@router.get("/me", response_model=UsuarioProfileResponse)
-def get_current_user_profile(current_user: Usuario = Depends(get_current_user)):
-    """Devuelve el perfil del usuario autenticado."""
-    return current_user
