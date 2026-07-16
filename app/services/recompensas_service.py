@@ -129,35 +129,34 @@ class RecompensasService:
         # Nota: pg_advisory_xact_lock solo existe en PostgreSQL. Evitar ejecutar
         # la sentencia si la conexión no es Postgres (por ejemplo durante pruebas
         # con SQLite o entornos locales), para que no produzca un error 500.
+        dialect = None
         try:
-            # Intentar obtener el dialecto desde el bind/session
-            dialect = None
+            bind = None
             try:
-                dialect = self.db.get_bind().dialect.name  # SQLAlchemy 1.4+
+                bind = self.db.get_bind()
             except Exception:
-                dialect = getattr(getattr(self.db, "bind", None), "dialect", None)
-                if dialect is not None:
-                    dialect = getattr(dialect, "name", None)
+                bind = getattr(self.db, "bind", None)
 
-            if dialect == "postgresql":
+            if bind is not None and getattr(bind, "dialect", None) is not None:
+                dialect = getattr(bind.dialect, "name", None)
+        except Exception:
+            dialect = None
+
+        if dialect == "postgresql":
+            try:
                 self.db.execute(
                     text("SELECT pg_advisory_xact_lock(hashtext(:uid::text))"),
                     {"uid": str(usuario_id)},
                 )
-        except Exception as exc:
-            # No queremos que un fallo en el lock haga explotar el endpoint con
-            # 500 en entornos no preparados; loguear y traducir a DBError si es
-            # realmente un error de base de datos.
-            import logging
+            except Exception as exc:
+                # Solo traducir a DBError si realmente falló la adquisición del
+                # lock en Postgres — eso es indicativo de un problema real en
+                # el servidor de BD.
+                import logging
 
-            logging.exception("Error intentando obtener advisory lock: %s", exc)
-            # Si la excepción viene de intentar ejecutar la función Postgres en
-            # un SGDB distinto, mejor seguir sin lock (solo en entornos de dev
-            # o pruebas). Pero si es una excepción grave, traducirla a DBError.
-            # Para simplificar, solo traducimos si el dialecto reportado era
-            # 'postgresql' — en ese caso la falla es real.
-            if 'postgresql' in (str(getattr(getattr(self.db, 'bind', None), 'dialect', None)) or ''):
+                logging.exception("Error intentando obtener advisory lock: %s", exc)
                 raise DBError("Error acquiring advisory lock") from exc
+        # Si no es Postgres, simplemente saltar el advisory lock (ej.: tests/local)
 
         # 2) Recompensa con lock de fila. Recien aca tenemos recompensa.puntos.
         recompensa = self.recompensa_repo.obtener_con_lock(recompensa_id)
