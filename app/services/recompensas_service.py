@@ -3,7 +3,7 @@ from hashlib import sha1
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import HTTPException
+from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -21,6 +21,7 @@ from app.models.gamificacion import Recompensa
 from app.models.poi import Poi
 from app.models.usuario import Usuario
 from app.repositories.canje_repository import CanjeRepository
+from app.repositories.comercial_repository import ComercialRepository
 from app.repositories.movimiento_puntos_repository import MovimientoPuntosRepository
 from app.repositories.puntos_repository import PuntosRepository
 from app.repositories.recompensa_repository import RecompensaRepository
@@ -64,6 +65,7 @@ class RecompensasService:
         self.canje_repo = CanjeRepository(db)
         self.movimiento_repo = MovimientoPuntosRepository(db)
         self.puntos_repo = PuntosRepository(db)
+        self.comercial_repo = ComercialRepository(db)
 
     def crear(self, datos: RecompensaCreate) -> RecompensaOut:
         """Crea una recompensa en estado APROBADO (fijo, no viene del body).
@@ -262,25 +264,60 @@ class RecompensasService:
         items = [self._canje_a_out(c) for c in canjes]
         return PaginatedCanjesResponse(items=items, total=total, page=page, page_size=limit)
 
+    def _establecimiento_id_de_recompensa(self, recompensa: Recompensa) -> Optional[str]:
+        """Establecimiento dueño de la recompensa, si tiene uno. `recompensa.poi_id`
+        es nullable a propósito (ver doc/logica_negocio.md): no toda recompensa
+        depende de un aliado comercial, así que puede no haber ninguno."""
+        if recompensa.poi_id is None:
+            return None
+        establecimiento = self.comercial_repo.get_establecimiento_by_poi(str(recompensa.poi_id))
+        return str(establecimiento.id) if establecimiento else None
+
+    def _ensure_puede_gestionar_canje(self, recompensa: Recompensa, current_user: Usuario, is_admin: bool) -> None:
+        """ADMIN, o staff (cualquier cargo) del establecimiento dueño de la
+        recompensa del canje. Reemplaza el chequeo anterior por rol global
+        (`get_admin_or_establecimiento_user`) ahora que existe el módulo
+        Comercial y se puede validar pertenencia real vía `establecimiento_usuarios`."""
+        if is_admin:
+            return
+        establecimiento_id = self._establecimiento_id_de_recompensa(recompensa)
+        if establecimiento_id and self.comercial_repo.es_staff(establecimiento_id, str(current_user.id)):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes permisos sobre el establecimiento dueño de esta recompensa",
+        )
+
     def obtener_canje(self, id: str, current_user: Usuario, is_admin: bool) -> CanjeValidacionOut:
-        """Detalle de un canje. Solo el dueño o un ADMIN (ver nota sobre
-        alcance de ESTABLECIMIENTO en get_admin_or_establecimiento_user)."""
+        """Detalle de un canje. Dueño del canje, ADMIN, o staff del
+        establecimiento dueño de la recompensa (si tiene uno)."""
         canje = self.canje_repo.obtener_por_id(id)
         if canje is None:
             raise RecordNotFoundError(f"Canje with id {id} not found")
+
         if not is_admin and str(canje.usuario_id) != str(current_user.id):
-            # 404, no 403: no revelar que el canje existe si no es tuyo (mismo
-            # criterio que GET /poi/{id} con un POI no publicado).
-            raise RecordNotFoundError(f"Canje with id {id} not found")
+            recompensa = self.recompensa_repo.obtener_por_id(str(canje.recompensa_id))
+            establecimiento_id = self._establecimiento_id_de_recompensa(recompensa)
+            es_staff = establecimiento_id and self.comercial_repo.es_staff(
+                establecimiento_id, str(current_user.id)
+            )
+            if not es_staff:
+                # 404, no 403: no revelar que el canje existe si no te involucra
+                # (mismo criterio que GET /poi/{id} con un POI no publicado).
+                raise RecordNotFoundError(f"Canje with id {id} not found")
         return self._canje_a_validacion_out(canje)
 
-    def validar_qr(self, codigo_qr: str) -> CanjeValidacionOut:
-        """Redime un canje presentado físicamente por su codigo_qr. Solo
-        ADMIN/ESTABLECIMIENTO llegan aquí (autorización en el router).
-        PENDIENTE -> REDIMIDO, o marca EXPIRADO de forma perezosa si ya venció."""
+    def validar_qr(self, codigo_qr: str, current_user: Usuario, is_admin: bool) -> CanjeValidacionOut:
+        """Redime un canje presentado físicamente por su codigo_qr. Autorización
+        por pertenencia real: ADMIN o staff del establecimiento dueño de la
+        recompensa (ver _ensure_puede_gestionar_canje). PENDIENTE -> REDIMIDO,
+        o marca EXPIRADO de forma perezosa si ya venció."""
         canje = self.canje_repo.obtener_por_codigo_qr(codigo_qr)
         if canje is None:
             raise RecordNotFoundError("Código QR no encontrado")
+
+        recompensa = self.recompensa_repo.obtener_por_id(str(canje.recompensa_id))
+        self._ensure_puede_gestionar_canje(recompensa, current_user, is_admin)
 
         if canje.estado == "PENDIENTE" and canje.fecha_expira is not None:
             if datetime.now(timezone.utc) > canje.fecha_expira:

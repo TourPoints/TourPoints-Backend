@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_admin_or_establecimiento_user, get_current_user, get_current_user_con_flag_admin
+from app.auth.dependencies import get_current_user, get_current_user_con_flag_admin
 from app.database import get_db
 from app.models.usuario import Usuario
 from app.schemas.gamificacion import CanjeValidacionOut, CanjeValidateQR, PaginatedCanjesResponse
@@ -41,8 +41,10 @@ def get_canje(
 def validate_qr(
     data: CanjeValidateQR,
     service: RecompensasService = Depends(get_recompensas_service),
-    staff_user: Usuario = Depends(get_admin_or_establecimiento_user),
+    user_admin: tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
     """Redime un canje presentado físicamente por su código QR. Solo ADMIN o
-    rol establecimiento (quien escanea el QR en el punto de canje)."""
-    return service.validar_qr(data.codigo_qr)
+    staff del establecimiento dueño de la recompensa (quien escanea el QR
+    en el punto de canje) — autorización por pertenencia real, no por rol global."""
+    current_user, es_admin = user_admin
+    return service.validar_qr(data.codigo_qr, current_user, es_admin)
