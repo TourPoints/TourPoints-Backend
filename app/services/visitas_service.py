@@ -9,11 +9,19 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import DBError, RecordNotFoundError
 from app.models.enums import MetodoValidacion, PoiEstado, VisitaEstado
 from app.models.gamificacion import ReglaPuntos
+from app.models.movimiento_puntos import MovimientoPuntos
 from app.models.poi import CategoriaPoi, Poi
 from app.models.visita import Visita
 from app.repositories.movimiento_puntos_repository import MovimientoPuntosRepository
 from app.repositories.puntos_repository import PuntosRepository
-from app.schemas.visita import VisitaCreate, VisitaOut
+from app.schemas.visita import (
+    PaginatedVisitasResponse,
+    VisitaCreate,
+    VisitaHistorialItem,
+    VisitaOut,
+    VisitaPoiMini,
+)
+from app.utils.qr import verificar_qr_checkin_poi
 
 # Solo se usa si no se ejecutó el seed de reglas_puntos o este no contiene una
 # regla aplicable a VISITA. En un entorno normal, la regla base sembrada gana.
@@ -27,13 +35,7 @@ class VisitasService:
         self.puntos_repo = PuntosRepository(db)
 
     def registrar(self, usuario_id: str, datos: VisitaCreate) -> VisitaOut:
-        """Valida una visita GPS y acredita sus puntos en la misma transacción."""
-        if datos.metodo_validacion != MetodoValidacion.GPS:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Solo se admite metodo_validacion=GPS por ahora",
-            )
-
+        """Valida una visita (GPS, QR o MIXTA) y acredita sus puntos en la misma transacción."""
         poi = self.db.query(Poi).filter(Poi.id == datos.poi_id).first()
         if poi is None or poi.estado != PoiEstado.APROBADO:
             raise RecordNotFoundError(f"POI with id {datos.poi_id} not found")
@@ -57,23 +59,35 @@ class VisitasService:
                 detail="Ya registraste una visita validada a este POI hoy",
             )
 
-        distancia = self.db.execute(
-            select(
-                func.ST_Distance(
-                    Poi.ubicacion, func.ST_GeogFromText(datos.ubicacion_usuario)
+        necesita_gps = datos.metodo_validacion in (MetodoValidacion.GPS, MetodoValidacion.MIXTA)
+        necesita_qr = datos.metodo_validacion in (MetodoValidacion.QR, MetodoValidacion.MIXTA)
+
+        distancia_metros = None
+        if necesita_gps:
+            distancia = self.db.execute(
+                select(
+                    func.ST_Distance(
+                        Poi.ubicacion, func.ST_GeogFromText(datos.ubicacion_usuario)
+                    )
+                ).where(Poi.id == datos.poi_id)
+            ).scalar_one()
+            distancia_metros = float(distancia)
+            limite_metros = float(poi.radio_validacion) + datos.precision_metros
+            if distancia_metros > limite_metros:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Estás a {distancia_metros:.1f} m del POI; "
+                        f"el máximo permitido es {limite_metros:.1f} m"
+                    ),
                 )
-            ).where(Poi.id == datos.poi_id)
-        ).scalar_one()
-        distancia_metros = float(distancia)
-        limite_metros = float(poi.radio_validacion) + datos.precision_metros
-        if distancia_metros > limite_metros:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    f"Estás a {distancia_metros:.1f} m del POI; "
-                    f"el máximo permitido es {limite_metros:.1f} m"
-                ),
-            )
+
+        if necesita_qr:
+            if not verificar_qr_checkin_poi(str(poi.id), datos.codigo_qr):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Código QR inválido para este POI",
+                )
 
         categoria_nombre = (
             self.db.query(CategoriaPoi.nombre)
@@ -85,8 +99,8 @@ class VisitasService:
             visita = Visita(
                 usuario_id=usuario_id,
                 poi_id=datos.poi_id,
-                ubicacion_usuario=func.ST_GeogFromText(datos.ubicacion_usuario),
-                precision_metros=datos.precision_metros,
+                ubicacion_usuario=func.ST_GeogFromText(datos.ubicacion_usuario) if necesita_gps else None,
+                precision_metros=datos.precision_metros if necesita_gps else None,
                 distancia_metros=distancia_metros,
                 metodo_validacion=datos.metodo_validacion,
                 estado=VisitaEstado.VALIDADA,
@@ -111,13 +125,43 @@ class VisitasService:
             id=visita.id,
             poi_id=visita.poi_id,
             estado=visita.estado,
-            distancia_metros=float(visita.distancia_metros),
+            distancia_metros=float(visita.distancia_metros) if visita.distancia_metros is not None else None,
             puntos_otorgados=puntos,
             created_at=visita.created_at,
         )
 
     def obtener_saldo(self, usuario_id: str) -> int:
         return self.puntos_repo.obtener_saldo(usuario_id)
+
+    def listar_mis_visitas(self, usuario_id: str, skip: int, limit: int, page: int) -> PaginatedVisitasResponse:
+        """Historial paginado de check-ins del usuario, más reciente primero.
+        `puntos_otorgados` sale de movimientos_puntos (no vive en Visita) vía
+        outerjoin por visita_id: 0 si la visita no generó movimiento."""
+        rows = (
+            self.db.query(Visita, Poi, func.coalesce(MovimientoPuntos.puntos, 0))
+            .join(Poi, Poi.id == Visita.poi_id)
+            .outerjoin(MovimientoPuntos, MovimientoPuntos.visita_id == Visita.id)
+            .filter(Visita.usuario_id == usuario_id)
+            .order_by(Visita.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+        total = self.db.query(Visita).filter(Visita.usuario_id == usuario_id).count()
+
+        items = [
+            VisitaHistorialItem(
+                id=visita.id,
+                poi=VisitaPoiMini.model_validate(poi),
+                estado=visita.estado,
+                metodo_validacion=visita.metodo_validacion,
+                distancia_metros=float(visita.distancia_metros) if visita.distancia_metros is not None else None,
+                puntos_otorgados=int(puntos or 0),
+                created_at=visita.created_at,
+            )
+            for visita, poi, puntos in rows
+        ]
+        return PaginatedVisitasResponse(items=items, total=total, page=page, page_size=limit)
 
     def _puntos_para_visita(
         self, poi: Poi, categoria_nombre: str | None

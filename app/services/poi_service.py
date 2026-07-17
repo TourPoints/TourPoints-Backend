@@ -22,9 +22,11 @@ from app.schemas.poi import (
     PoiListItem,
     PoiModeracion,
     PoiModeracionLogOut,
+    PoiQrCodeOut,
     PoiUpdate,
 )
 from app.services.cloudinary_service import upload_poi_imagen
+from app.utils.qr import generar_qr_checkin_poi
 
 ROLE_TO_FUENTE = {
     "admin": PoiFuente.ADMIN,
@@ -285,6 +287,16 @@ class PoiService:
             raise
         except Exception as exc:
             raise DBError(f"Poi moderacion historial failed: {str(exc)}") from exc
+
+    def get_qr_code(self, poi_id: str, current_user: Usuario, is_admin: bool) -> PoiQrCodeOut:
+        """Código QR de check-in del POI, para imprimir/mostrar en el sitio.
+        Determinístico (HMAC sobre poi_id): no se guarda en la base de datos,
+        se recalcula igual cada vez. Solo el dueño o un ADMIN pueden verlo."""
+        poi = self.repository.get_by_id(poi_id)
+        if not poi:
+            raise RecordNotFoundError(f"Poi with id {poi_id} not found")
+        self._ensure_owner_or_admin(poi, current_user, is_admin)
+        return PoiQrCodeOut(codigo_qr=generar_qr_checkin_poi(str(poi.id)))
 
     def delete_poi(self, poi_id: str, current_user: Usuario, is_admin: bool) -> None:
         try:

@@ -16,6 +16,7 @@ from app.schemas.poi import (
     PoiDetail,
     PoiModeracion,
     PoiModeracionLogOut,
+    PoiQrCodeOut,
     PoiUpdate,
 )
 from app.services.poi_service import PoiService
@@ -136,6 +137,18 @@ def get_poi_moderaciones(
 ):
     """Historial de auditoría de cambios de estado del POI. Solo el dueño o un ADMIN."""
     return service.get_moderacion_historial(str(poi_id), current_user, is_admin_user(current_user, db))
+
+
+@router.get("/{poi_id}/qr-code", response_model=PoiQrCodeOut)
+def get_poi_qr_code(
+    poi_id: UUID,
+    service: PoiService = Depends(get_poi_service),
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Código QR de check-in del POI, para imprimir/mostrar en el sitio y usar
+    en POST /visits con metodo_validacion=QR o MIXTA. Solo el dueño o un ADMIN."""
+    return service.get_qr_code(str(poi_id), current_user, is_admin_user(current_user, db))
 
 
 @router.delete("/{poi_id}", status_code=status.HTTP_204_NO_CONTENT)

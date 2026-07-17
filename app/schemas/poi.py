@@ -140,3 +140,10 @@ class PoiModeracionLogOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class PoiQrCodeOut(BaseModel):
+    """Código para imprimir/mostrar físicamente en el POI y usar en
+    POST /visits con metodo_validacion=QR o MIXTA."""
+
+    codigo_qr: str
