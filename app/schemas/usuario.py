@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
 
@@ -31,6 +31,14 @@ class UsuarioResponse(UsuarioBase):
 
     class Config:
         from_attributes = True  # Permite crear desde objeto ORM
+
+
+class PaginatedUsuariosResponse(BaseModel):
+    """Envoltura de paginación consistente con el resto de listados (POI, ciudades, categorías)."""
+    items: List[UsuarioResponse]
+    total: int
+    page: int
+    page_size: int
 
 
 class UsuarioLogin(BaseModel):

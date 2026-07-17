@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -8,7 +8,7 @@ from app.auth.security import hash_password, verify_password
 from app.database import get_db
 from app.models.usuario import Usuario
 from app.repositories.usuario_repository import UsuarioRepository
-from app.schemas.usuario import UsuarioCreate, UsuarioResponse
+from app.schemas.usuario import PaginatedUsuariosResponse, UsuarioCreate, UsuarioResponse
 from app.schemas.usuarios import ChangePasswordRequest, UsuarioUpdate
 from app.services.usuario_service import UsuarioService
 
@@ -30,10 +30,10 @@ def create_user(
     return service.create_user(user_data)
 
 
-@router.get("", response_model=List[UsuarioResponse])
+@router.get("", response_model=PaginatedUsuariosResponse)
 def list_users(
-    skip: int = Query(0, ge=0, description="Número de registros a saltar"),
-    limit: int = Query(100, ge=1, le=100, description="Límite de registros por página"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     name: Optional[str] = Query(None, description="Filtrar por nombre"),
     surname: Optional[str] = Query(None, description="Filtrar por apellido"),
     email: Optional[str] = Query(None, description="Filtrar por email"),
@@ -58,7 +58,10 @@ def list_users(
     if include_deleted:
         filters["include_deleted"] = True
 
-    return service.list_users(skip=skip, limit=limit, **filters)
+    skip = (page - 1) * page_size
+    items = service.list_users(skip=skip, limit=page_size, **filters)
+    total = service.count_users(**filters)
+    return PaginatedUsuariosResponse(items=items, total=total, page=page, page_size=page_size)
 
 
 @router.get("/count", response_model=int)
