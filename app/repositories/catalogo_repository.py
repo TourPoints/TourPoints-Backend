@@ -3,12 +3,44 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from app.models.poi import CategoriaPoi
-from app.models.ubicacion import Ciudad, Departamento
+from app.models.ubicacion import Ciudad, Departamento, Pais
 
 
 class CatalogoRepository:
     def __init__(self, db: Session):
         self.db = db
+
+    def _filtered_paises_query(self, **filters):
+        query = self.db.query(Pais)
+        if filters.get("q"):
+            query = query.filter(Pais.nombre.ilike(f"%{filters['q']}%"))
+        return query
+
+    def list_paises(self, skip: int = 0, limit: int = 20, **filters) -> List[Pais]:
+        return self._filtered_paises_query(**filters).order_by(Pais.nombre).offset(skip).limit(limit).all()
+
+    def count_paises(self, **filters) -> int:
+        return self._filtered_paises_query(**filters).count()
+
+    def _filtered_departamentos_query(self, **filters):
+        query = self.db.query(Departamento, Pais.nombre.label("pais")).join(Pais, Pais.id == Departamento.pais_id)
+        if filters.get("pais_id"):
+            query = query.filter(Departamento.pais_id == filters["pais_id"])
+        if filters.get("q"):
+            query = query.filter(Departamento.nombre.ilike(f"%{filters['q']}%"))
+        return query
+
+    def list_departamentos(self, skip: int = 0, limit: int = 20, **filters):
+        return (
+            self._filtered_departamentos_query(**filters)
+            .order_by(Departamento.nombre)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    def count_departamentos(self, **filters) -> int:
+        return self._filtered_departamentos_query(**filters).count()
 
     def _filtered_ciudades_query(self, **filters):
         query = self.db.query(Ciudad, Departamento.nombre.label("departamento")).join(
