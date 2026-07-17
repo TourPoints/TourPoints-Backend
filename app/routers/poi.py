@@ -94,7 +94,7 @@ def update_poi(
     return service.update_poi(str(poi_id), poi_data, current_user, is_admin_user(current_user, db))
 
 
-@router.post("/{poi_id}/enviar-revision", response_model=EnviarRevisionResponse)
+@router.post("/{poi_id}/submit-for-review", response_model=EnviarRevisionResponse)
 def enviar_revision(
     poi_id: UUID,
     service: PoiService = Depends(get_poi_service),
@@ -105,7 +105,7 @@ def enviar_revision(
     return service.enviar_revision(str(poi_id), current_user, is_admin_user(current_user, db))
 
 
-@router.patch("/{poi_id}/moderacion", response_model=PoiDetail)
+@router.patch("/{poi_id}/moderation", response_model=PoiDetail)
 def moderar_poi(
     poi_id: UUID,
     data: PoiModeracion,
@@ -116,7 +116,7 @@ def moderar_poi(
     return service.moderar(str(poi_id), data, admin_user)
 
 
-@router.post("/{poi_id}/reintentar", response_model=PoiDetail)
+@router.post("/{poi_id}/retry", response_model=PoiDetail)
 def reintentar_poi(
     poi_id: UUID,
     service: PoiService = Depends(get_poi_service),
@@ -127,7 +127,7 @@ def reintentar_poi(
     return service.reintentar(str(poi_id), current_user, is_admin_user(current_user, db))
 
 
-@router.get("/{poi_id}/moderaciones", response_model=List[PoiModeracionLogOut])
+@router.get("/{poi_id}/moderation-log", response_model=List[PoiModeracionLogOut])
 def get_poi_moderaciones(
     poi_id: UUID,
     service: PoiService = Depends(get_poi_service),
@@ -150,7 +150,7 @@ def delete_poi(
     return None
 
 
-@router.post("/{poi_id}/imagenes", response_model=ImagenPoiCreateOut, status_code=status.HTTP_201_CREATED)
+@router.post("/{poi_id}/images", response_model=ImagenPoiCreateOut, status_code=status.HTTP_201_CREATED)
 def add_poi_imagen(
     poi_id: UUID,
     file: UploadFile = File(...),

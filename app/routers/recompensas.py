@@ -68,7 +68,7 @@ def actualizar_recompensa(
     return service.actualizar(recompensa_id, datos)
 
 
-@router.post("/{recompensa_id}/canjear", response_model=CanjeOut, status_code=status.HTTP_201_CREATED)
+@router.post("/{recompensa_id}/redeem", response_model=CanjeOut, status_code=status.HTTP_201_CREATED)
 def canjear_recompensa(
     recompensa_id: str,
     service: RecompensasService = Depends(get_recompensas_service),

@@ -35,7 +35,7 @@ def get_social_service(db: Session = Depends(get_db)) -> SocialService:
 # --- Calificaciones ---
 
 
-@router.put("/poi/{poi_id}/mi-calificacion", response_model=CalificacionOut)
+@router.put("/poi/{poi_id}/my-rating", response_model=CalificacionOut)
 def set_mi_calificacion(
     poi_id: UUID,
     data: CalificacionCreate,
@@ -46,7 +46,7 @@ def set_mi_calificacion(
     return service.set_mi_calificacion(str(poi_id), current_user, data)
 
 
-@router.delete("/poi/{poi_id}/mi-calificacion", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/poi/{poi_id}/my-rating", status_code=status.HTTP_204_NO_CONTENT)
 def delete_mi_calificacion(
     poi_id: UUID,
     service: SocialService = Depends(get_social_service),
@@ -57,7 +57,7 @@ def delete_mi_calificacion(
     return None
 
 
-@router.get("/poi/{poi_id}/calificaciones", response_model=PaginatedCalificacionesResponse)
+@router.get("/poi/{poi_id}/ratings", response_model=PaginatedCalificacionesResponse)
 def list_calificaciones(
     poi_id: UUID,
     page: int = Query(1, ge=1),
@@ -69,7 +69,7 @@ def list_calificaciones(
     return service.list_calificaciones(str(poi_id), skip=skip, limit=page_size, page=page)
 
 
-@router.get("/poi/{poi_id}/calificaciones/resumen", response_model=CalificacionResumen)
+@router.get("/poi/{poi_id}/ratings/summary", response_model=CalificacionResumen)
 def resumen_calificaciones(
     poi_id: UUID,
     service: SocialService = Depends(get_social_service),
@@ -81,7 +81,7 @@ def resumen_calificaciones(
 # --- Comentarios ---
 
 
-@router.post("/poi/{poi_id}/comentarios", response_model=ComentarioOut, status_code=status.HTTP_201_CREATED)
+@router.post("/poi/{poi_id}/comments", response_model=ComentarioOut, status_code=status.HTTP_201_CREATED)
 def create_comentario(
     poi_id: UUID,
     data: ComentarioCreate,
@@ -92,7 +92,7 @@ def create_comentario(
     return service.create_comentario(str(poi_id), current_user, data)
 
 
-@router.get("/poi/{poi_id}/comentarios", response_model=PaginatedComentariosResponse)
+@router.get("/poi/{poi_id}/comments", response_model=PaginatedComentariosResponse)
 def list_comentarios(
     poi_id: UUID,
     estado: Optional[str] = Query(None, description="Solo ADMIN puede filtrar por estado"),
@@ -109,7 +109,7 @@ def list_comentarios(
     )
 
 
-@router.patch("/comentarios/{comentario_id}/moderacion", response_model=ComentarioOut)
+@router.patch("/comments/{comentario_id}/moderation", response_model=ComentarioOut)
 def moderar_comentario(
     comentario_id: int,
     data: ComentarioModeracion,
@@ -120,7 +120,7 @@ def moderar_comentario(
     return service.moderar_comentario(comentario_id, data)
 
 
-@router.delete("/comentarios/{comentario_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/comments/{comentario_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_comentario(
     comentario_id: int,
     service: SocialService = Depends(get_social_service),
@@ -135,7 +135,7 @@ def delete_comentario(
 # --- Favoritos ---
 
 
-@router.post("/favoritos", response_model=FavoritoOut, status_code=status.HTTP_201_CREATED)
+@router.post("/favorites", response_model=FavoritoOut, status_code=status.HTTP_201_CREATED)
 def add_favorito(
     data: FavoritoCreate,
     service: SocialService = Depends(get_social_service),
@@ -145,7 +145,7 @@ def add_favorito(
     return service.add_favorito(current_user, str(data.poi_id))
 
 
-@router.delete("/favoritos/{poi_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/favorites/{poi_id}", status_code=status.HTTP_204_NO_CONTENT)
 def remove_favorito(
     poi_id: UUID,
     service: SocialService = Depends(get_social_service),
@@ -156,7 +156,7 @@ def remove_favorito(
     return None
 
 
-@router.get("/favoritos/me", response_model=PaginatedPoiResponse)
+@router.get("/favorites/me", response_model=PaginatedPoiResponse)
 def list_mis_favoritos(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),

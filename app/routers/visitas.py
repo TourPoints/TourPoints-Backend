@@ -24,7 +24,7 @@ def registrar_visita(
     return service.registrar(str(current_user.id), datos)
 
 
-@router.get("/me/saldo", response_model=SaldoPuntosOut)
+@router.get("/me/balance", response_model=SaldoPuntosOut)
 def obtener_mi_saldo(
     service: VisitasService = Depends(get_visitas_service),
     current_user: Usuario = Depends(get_current_user),

@@ -8,14 +8,14 @@ from app.repositories.catalogo_repository import CatalogoRepository
 from app.schemas.catalogos import PaginatedCategoriasResponse, PaginatedCiudadesResponse
 from app.services.catalogo_service import CatalogoService
 
-router = APIRouter(tags=["catalogos"])
+router = APIRouter(tags=["catalogs"])
 
 
 def get_catalogo_service(db: Session = Depends(get_db)) -> CatalogoService:
     return CatalogoService(CatalogoRepository(db))
 
 
-@router.get("/ciudades", response_model=PaginatedCiudadesResponse)
+@router.get("/cities", response_model=PaginatedCiudadesResponse)
 def list_ciudades(
     departamento_id: Optional[int] = Query(None),
     pais_id: Optional[int] = Query(None),
@@ -31,7 +31,7 @@ def list_ciudades(
     return service.list_ciudades(skip=skip, limit=page_size, page=page, **filters)
 
 
-@router.get("/categorias-poi", response_model=PaginatedCategoriasResponse)
+@router.get("/poi-categories", response_model=PaginatedCategoriasResponse)
 def list_categorias_poi(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
