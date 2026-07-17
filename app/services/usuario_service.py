@@ -1,10 +1,16 @@
+import logging
 from typing import List
+
+from fastapi import HTTPException, UploadFile, status
 
 from app.auth.security import hash_password
 from app.core.exceptions import ConflictError, DBError, RecordNotFoundError
 from app.repositories.usuario_repository import UsuarioRepository
 from app.schemas.usuario import UsuarioCreate, UsuarioResponse
 from app.schemas.usuarios import UsuarioUpdate
+from app.services.cloudinary_service import extraer_public_id, upload_usuario_foto
+from app.services.cloudinary_service import delete_imagen as cloudinary_delete_imagen
+from app.utils.media import ALLOWED_IMAGE_CONTENT_TYPES
 
 
 class UsuarioService:
@@ -109,3 +115,59 @@ class UsuarioService:
             raise
         except Exception as exc:
             raise DBError(f"Suspend user failed: {str(exc)}") from exc
+
+    def upload_foto(self, user_id: str, file: UploadFile) -> UsuarioResponse:
+        """Sube la foto de perfil a Cloudinary y reemplaza foto_url. Si ya
+        tenía una, borra el asset anterior (mismo criterio que las imágenes de POI:
+        no dejar huérfanos, pero no bloquear la subida si ese borrado falla)."""
+        try:
+            user = self.repository.get_by_id(user_id)
+            if not user:
+                raise RecordNotFoundError(f"User with id {user_id} not found")
+
+            if file.content_type not in ALLOWED_IMAGE_CONTENT_TYPES:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Formato de imagen no soportado (usa JPEG, PNG o WEBP)",
+                )
+
+            foto_anterior = user.foto_url
+            upload_result = upload_usuario_foto(file.file, usuario_id=str(user_id))
+            updated_user = self.repository.update(user_id, {"foto_url": upload_result["secure_url"]})
+
+            if foto_anterior:
+                public_id_anterior = extraer_public_id(foto_anterior)
+                if public_id_anterior:
+                    try:
+                        cloudinary_delete_imagen(public_id_anterior)
+                    except Exception:
+                        logging.exception("No se pudo borrar la foto anterior en Cloudinary: %s", public_id_anterior)
+
+            return UsuarioResponse.model_validate(updated_user)
+        except HTTPException:
+            raise
+        except RecordNotFoundError:
+            raise
+        except Exception as exc:
+            raise DBError(f"User photo upload failed: {str(exc)}") from exc
+
+    def delete_foto(self, user_id: str) -> UsuarioResponse:
+        try:
+            user = self.repository.get_by_id(user_id)
+            if not user:
+                raise RecordNotFoundError(f"User with id {user_id} not found")
+
+            if user.foto_url:
+                public_id = extraer_public_id(user.foto_url)
+                if public_id:
+                    try:
+                        cloudinary_delete_imagen(public_id)
+                    except Exception:
+                        logging.exception("No se pudo borrar la foto en Cloudinary: %s", public_id)
+
+            updated_user = self.repository.update(user_id, {"foto_url": None})
+            return UsuarioResponse.model_validate(updated_user)
+        except RecordNotFoundError:
+            raise
+        except Exception as exc:
+            raise DBError(f"User photo delete failed: {str(exc)}") from exc

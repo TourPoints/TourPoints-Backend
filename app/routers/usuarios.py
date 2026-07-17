@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_admin_user, get_current_user
@@ -139,6 +139,26 @@ def change_current_user_password(
     current_user.password_hash = hash_password(password_data.new_password)
     db.commit()
     return None
+
+
+@router.post("/me/photo", response_model=UsuarioResponse)
+def upload_current_user_photo(
+    file: UploadFile = File(...),
+    service: UsuarioService = Depends(get_user_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Sube/reemplaza la foto de perfil del usuario autenticado. multipart/form-data: `file`
+    (image/jpeg, image/png o image/webp)."""
+    return service.upload_foto(str(current_user.id), file)
+
+
+@router.delete("/me/photo", response_model=UsuarioResponse)
+def delete_current_user_photo(
+    service: UsuarioService = Depends(get_user_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Quita la foto de perfil del usuario autenticado (borra el asset en Cloudinary y limpia foto_url)."""
+    return service.delete_foto(str(current_user.id))
 
 
 @router.post("/{user_id}/activate", response_model=UsuarioResponse)

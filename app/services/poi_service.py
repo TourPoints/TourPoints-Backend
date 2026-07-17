@@ -29,6 +29,7 @@ from app.schemas.poi import (
 )
 from app.services.cloudinary_service import extraer_public_id, upload_poi_imagen
 from app.services.cloudinary_service import delete_imagen as cloudinary_delete_imagen
+from app.utils.media import ALLOWED_IMAGE_CONTENT_TYPES
 from app.utils.qr import generar_qr_checkin_poi
 
 ROLE_TO_FUENTE = {
@@ -42,8 +43,6 @@ VALID_MODERATION_TRANSITIONS = {
     PoiEstado.APROBADO: {PoiEstado.INACTIVO},
     PoiEstado.INACTIVO: {PoiEstado.APROBADO},
 }
-
-ALLOWED_IMAGE_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 def slugify(texto: str) -> str:
