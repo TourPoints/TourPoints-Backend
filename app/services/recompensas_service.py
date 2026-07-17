@@ -29,6 +29,7 @@ from app.schemas.gamificacion import (
     CanjeOut,
     CanjeValidacionOut,
     PaginatedCanjesResponse,
+    PaginatedRecompensasResponse,
     RecompensaCreate,
     RecompensaOut,
     RecompensaUpdate,
@@ -103,20 +104,21 @@ class RecompensasService:
 
     def listar(
         self,
+        skip: int,
+        limit: int,
+        page: int,
         poi_id: Optional[str] = None,
         estado: Optional[str] = None,
         solo_aprobado: bool = True,
-        limit: int = 100,
-        offset: int = 0,
-    ) -> List[RecompensaOut]:
+    ) -> PaginatedRecompensasResponse:
         """Lista recompensas. `solo_aprobado=True` fuerza estado=APROBADO
         para usuarios comunes (ignora el param estado si vino)."""
         if solo_aprobado:
             estado = "APROBADO"
-        recompensas = self.recompensa_repo.listar(
-            poi_id=poi_id, estado=estado, limit=limit, offset=offset
-        )
-        return [_to_out(r) for r in recompensas]
+        recompensas = self.recompensa_repo.listar(poi_id=poi_id, estado=estado, limit=limit, offset=skip)
+        total = self.recompensa_repo.contar(poi_id=poi_id, estado=estado)
+        items = [_to_out(r) for r in recompensas]
+        return PaginatedRecompensasResponse(items=items, total=total, page=page, page_size=limit)
 
     def obtener(self, id: str, solo_aprobado: bool = True) -> RecompensaOut:
         recompensa = self.recompensa_repo.obtener_por_id(id)

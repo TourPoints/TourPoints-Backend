@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_admin_user, get_current_user, get_current_user_con_flag_admin
 from app.database import get_db
 from app.models.usuario import Usuario
-from app.schemas.gamificacion import CanjeOut, RecompensaCreate, RecompensaOut, RecompensaUpdate
+from app.schemas.gamificacion import (
+    CanjeOut,
+    PaginatedRecompensasResponse,
+    RecompensaCreate,
+    RecompensaOut,
+    RecompensaUpdate,
+)
 from app.services.recompensas_service import RecompensasService
 
 router = APIRouter(tags=["rewards"])
@@ -28,20 +34,21 @@ def crear_recompensa(
     return service.crear(datos)
 
 
-@router.get("", response_model=List[RecompensaOut])
+@router.get("", response_model=PaginatedRecompensasResponse)
 def listar_recompensas(
     poi_id: Optional[str] = Query(None, description="Filtrar por POI (aliado)"),
     estado: Optional[str] = Query(None, description="Filtrar por estado (solo admin ve no-APROBADO)"),
-    limit: int = Query(100, ge=1, le=100, description="Limite de resultados"),
-    offset: int = Query(0, ge=0, description="Offset para paginacion"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     service: RecompensasService = Depends(get_recompensas_service),
     user_admin: Tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
     """Lista recompensas. Usuario comun ve solo APROBADO; admin ve todo con filtro."""
     _, es_admin = user_admin
     solo_aprobado = not es_admin
+    skip = (page - 1) * page_size
     return service.listar(
-        poi_id=poi_id, estado=estado, solo_aprobado=solo_aprobado, limit=limit, offset=offset
+        skip=skip, limit=page_size, page=page, poi_id=poi_id, estado=estado, solo_aprobado=solo_aprobado
     )
 
 

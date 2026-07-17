@@ -17,6 +17,14 @@ class RecompensaRepository:
         self.db.flush()  # sin commit; lo hace el service
         return recompensa
 
+    def _filtered_query(self, poi_id: Optional[str] = None, estado: Optional[str] = None, **_ignored):
+        query = self.db.query(Recompensa)
+        if poi_id is not None:
+            query = query.filter(Recompensa.poi_id == poi_id)
+        if estado is not None:
+            query = query.filter(Recompensa.estado == estado)
+        return query
+
     def listar(
         self,
         poi_id: Optional[str] = None,
@@ -24,12 +32,16 @@ class RecompensaRepository:
         limit: int = 100,
         offset: int = 0,
     ) -> List[Recompensa]:
-        query = self.db.query(Recompensa)
-        if poi_id is not None:
-            query = query.filter(Recompensa.poi_id == poi_id)
-        if estado is not None:
-            query = query.filter(Recompensa.estado == estado)
-        return query.offset(offset).limit(limit).all()
+        return (
+            self._filtered_query(poi_id=poi_id, estado=estado)
+            .order_by(Recompensa.nombre)
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+    def contar(self, poi_id: Optional[str] = None, estado: Optional[str] = None) -> int:
+        return self._filtered_query(poi_id=poi_id, estado=estado).count()
 
     def obtener_por_id(self, id: str) -> Optional[Recompensa]:
         return self.db.query(Recompensa).filter(Recompensa.id == id).first()

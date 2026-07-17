@@ -48,6 +48,13 @@ class RecompensaOut(BaseModel):
         from_attributes = True
 
 
+class PaginatedRecompensasResponse(BaseModel):
+    items: list[RecompensaOut]
+    total: int
+    page: int
+    page_size: int
+
+
 class CanjeOut(BaseModel):
     """Salida del canje. Recompensa embebida como RecompensaOut."""
 
