@@ -189,6 +189,48 @@ class PoiRepository(BaseRepository[Poi]):
         self.db.refresh(imagen)
         return imagen
 
+    def get_imagen(self, poi_id: str, imagen_id: int) -> Optional[ImagenPoi]:
+        """Escopado por poi_id a propósito: que el id de la imagen exista no
+        alcanza, tiene que pertenecer a ESTE POI (evita IDOR entre POIs)."""
+        return (
+            self.db.query(ImagenPoi)
+            .filter(ImagenPoi.id == imagen_id, ImagenPoi.poi_id == poi_id)
+            .first()
+        )
+
+    def update_imagen(self, imagen: ImagenPoi, cambios: dict) -> ImagenPoi:
+        if cambios.get("principal") is True:
+            self.db.query(ImagenPoi).filter(
+                ImagenPoi.poi_id == imagen.poi_id,
+                ImagenPoi.principal.is_(True),
+                ImagenPoi.id != imagen.id,
+            ).update({"principal": False})
+
+        for field, value in cambios.items():
+            if value is not None and hasattr(imagen, field):
+                setattr(imagen, field, value)
+
+        self.db.commit()
+        self.db.refresh(imagen)
+        return imagen
+
+    def delete_imagen(self, imagen: ImagenPoi) -> None:
+        era_principal = imagen.principal
+        poi_id = imagen.poi_id
+        self.db.delete(imagen)
+        self.db.commit()
+
+        if era_principal:
+            siguiente = (
+                self.db.query(ImagenPoi)
+                .filter(ImagenPoi.poi_id == poi_id)
+                .order_by(ImagenPoi.orden)
+                .first()
+            )
+            if siguiente is not None:
+                siguiente.principal = True
+                self.db.commit()
+
     def log_transition(
         self, poi_id: str, usuario_id: str, estado_anterior: str, estado_nuevo: str, motivo: Optional[str] = None
     ) -> PoiModeracionLog:

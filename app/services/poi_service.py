@@ -1,3 +1,4 @@
+import logging
 import re
 import unicodedata
 from typing import List, Optional
@@ -16,6 +17,7 @@ from app.schemas.poi import (
     EnviarRevisionResponse,
     ImagenPoiCreateOut,
     ImagenPoiOut,
+    ImagenPoiUpdate,
     PaginatedPoiResponse,
     PoiCreate,
     PoiDetail,
@@ -25,7 +27,8 @@ from app.schemas.poi import (
     PoiQrCodeOut,
     PoiUpdate,
 )
-from app.services.cloudinary_service import upload_poi_imagen
+from app.services.cloudinary_service import extraer_public_id, upload_poi_imagen
+from app.services.cloudinary_service import delete_imagen as cloudinary_delete_imagen
 from app.utils.qr import generar_qr_checkin_poi
 
 ROLE_TO_FUENTE = {
@@ -331,3 +334,54 @@ class PoiService:
             raise
         except Exception as exc:
             raise DBError(f"Poi image upload failed: {str(exc)}") from exc
+
+    def update_imagen(
+        self, poi_id: str, imagen_id: int, data: ImagenPoiUpdate, current_user: Usuario, is_admin: bool
+    ) -> ImagenPoiOut:
+        """PATCH parcial: cambiar `principal` y/o `orden` sin resubir el archivo."""
+        try:
+            poi = self.repository.get_by_id(poi_id)
+            if not poi:
+                raise RecordNotFoundError(f"Poi with id {poi_id} not found")
+            self._ensure_owner_or_admin(poi, current_user, is_admin)
+
+            imagen = self.repository.get_imagen(poi_id, imagen_id)
+            if imagen is None:
+                raise RecordNotFoundError(f"Imagen with id {imagen_id} not found for this POI")
+
+            cambios = data.model_dump(exclude_unset=True)
+            imagen = self.repository.update_imagen(imagen, cambios)
+            return ImagenPoiOut.model_validate(imagen)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise DBError(f"Poi image update failed: {str(exc)}") from exc
+
+    def delete_imagen(self, poi_id: str, imagen_id: int, current_user: Usuario, is_admin: bool) -> None:
+        """Borra la imagen (fila + asset en Cloudinary). Si era la principal y
+        quedan otras, promueve la de menor `orden` automáticamente."""
+        try:
+            poi = self.repository.get_by_id(poi_id)
+            if not poi:
+                raise RecordNotFoundError(f"Poi with id {poi_id} not found")
+            self._ensure_owner_or_admin(poi, current_user, is_admin)
+
+            imagen = self.repository.get_imagen(poi_id, imagen_id)
+            if imagen is None:
+                raise RecordNotFoundError(f"Imagen with id {imagen_id} not found for this POI")
+
+            public_id = extraer_public_id(imagen.url)
+            if public_id:
+                try:
+                    cloudinary_delete_imagen(public_id)
+                except Exception:
+                    # No bloquear el borrado en BD por un fallo transitorio de
+                    # Cloudinary: peor caso es un asset huérfano en el storage,
+                    # no una referencia rota en la API.
+                    logging.exception("No se pudo borrar el asset en Cloudinary: %s", public_id)
+
+            self.repository.delete_imagen(imagen)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise DBError(f"Poi image delete failed: {str(exc)}") from exc

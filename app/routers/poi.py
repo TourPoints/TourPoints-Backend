@@ -11,6 +11,8 @@ from app.repositories.poi_repository import PoiRepository
 from app.schemas.poi import (
     EnviarRevisionResponse,
     ImagenPoiCreateOut,
+    ImagenPoiOut,
+    ImagenPoiUpdate,
     PaginatedPoiResponse,
     PoiCreate,
     PoiDetail,
@@ -174,3 +176,30 @@ def add_poi_imagen(
 ):
     """Sube una imagen a Cloudinary y la asocia al POI. Solo el dueño o un ADMIN."""
     return service.add_imagen(str(poi_id), file, principal, current_user, is_admin_user(current_user, db))
+
+
+@router.patch("/{poi_id}/images/{imagen_id}", response_model=ImagenPoiOut)
+def update_poi_imagen(
+    poi_id: UUID,
+    imagen_id: int,
+    data: ImagenPoiUpdate,
+    service: PoiService = Depends(get_poi_service),
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cambia `principal` y/o `orden` de una imagen ya subida, sin resubir el archivo. Solo el dueño o un ADMIN."""
+    return service.update_imagen(str(poi_id), imagen_id, data, current_user, is_admin_user(current_user, db))
+
+
+@router.delete("/{poi_id}/images/{imagen_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_poi_imagen(
+    poi_id: UUID,
+    imagen_id: int,
+    service: PoiService = Depends(get_poi_service),
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Borra una imagen del POI (fila + asset en Cloudinary). Si era la
+    principal, promueve automáticamente la de menor orden. Solo el dueño o un ADMIN."""
+    service.delete_imagen(str(poi_id), imagen_id, current_user, is_admin_user(current_user, db))
+    return None

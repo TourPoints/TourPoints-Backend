@@ -42,6 +42,13 @@ class ImagenPoiCreateOut(ImagenPoiOut):
     poi_id: UUID
 
 
+class ImagenPoiUpdate(BaseModel):
+    """Body de PATCH /poi/{id}/images/{imagen_id}. Ambos opcionales."""
+
+    principal: Optional[bool] = None
+    orden: Optional[int] = Field(None, ge=0)
+
+
 class PoiBase(BaseModel):
     categoria_id: int
     ciudad_id: int
