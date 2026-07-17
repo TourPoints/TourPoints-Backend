@@ -1,5 +1,8 @@
-from app.models.movimiento_puntos import MovimientoPuntos
+from typing import List
+
 from sqlalchemy.orm import Session
+
+from app.models.movimiento_puntos import MovimientoPuntos
 
 
 class MovimientoPuntosRepository:
@@ -15,3 +18,16 @@ class MovimientoPuntosRepository:
         self.db.add(movimiento)
         self.db.flush()
         return movimiento
+
+    def list_por_usuario(self, usuario_id: str, skip: int = 0, limit: int = 20) -> List[MovimientoPuntos]:
+        return (
+            self.db.query(MovimientoPuntos)
+            .filter(MovimientoPuntos.usuario_id == usuario_id)
+            .order_by(MovimientoPuntos.created_at.desc(), MovimientoPuntos.id.desc())
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+    def count_por_usuario(self, usuario_id: str) -> int:
+        return self.db.query(MovimientoPuntos).filter(MovimientoPuntos.usuario_id == usuario_id).count()
