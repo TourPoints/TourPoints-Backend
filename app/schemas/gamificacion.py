@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.models.enums import PoiEstado
+from app.schemas.social import UsuarioMini
 
 
 class RecompensaCreate(BaseModel):
@@ -56,6 +57,37 @@ class CanjeOut(BaseModel):
     codigo_qr: str
     estado: str
     fecha_expira: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PaginatedCanjesResponse(BaseModel):
+    items: list[CanjeOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class CanjeValidateQR(BaseModel):
+    """Body de POST /redemptions/validate-qr."""
+
+    codigo_qr: str = Field(..., min_length=1)
+
+
+class CanjeValidacionOut(BaseModel):
+    """Salida de POST /redemptions/validate-qr. Incluye `usuario` (a quién
+    pertenece el canje) y `fecha_redencion` — CanjeOut no los trae porque el
+    dueño ya sabe quién es; aquí lo necesita el staff que escanea el QR."""
+
+    id: UUID
+    recompensa: RecompensaOut
+    usuario: UsuarioMini
+    origen: str
+    estado: str
+    fecha_expira: Optional[datetime] = None
+    fecha_redencion: Optional[datetime] = None
     created_at: datetime
 
     class Config:

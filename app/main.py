@@ -4,7 +4,7 @@ from fastapi.openapi.docs import get_redoc_html
 
 from app.core.exception_handlers import register_exception_handlers
 from app.core.middleware import JWTMiddleware
-from app.routers import auth, catalogos, poi, recompensas, social, usuarios, visitas
+from app.routers import auth, canjes, catalogos, poi, recompensas, social, usuarios, visitas
 from os import getenv
 
 try:
@@ -33,6 +33,7 @@ api_v1.include_router(social.router)
 api_v1.include_router(usuarios.router, prefix="/users", tags=["users"])
 api_v1.include_router(visitas.router, prefix="/visits", tags=["visits"])
 api_v1.include_router(recompensas.router, prefix="/rewards", tags=["rewards"])
+api_v1.include_router(canjes.router, prefix="/redemptions", tags=["redemptions"])
 
 app.include_router(api_v1)
 

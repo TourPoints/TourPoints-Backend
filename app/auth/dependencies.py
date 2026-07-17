@@ -66,6 +66,21 @@ def get_admin_user(
     return current_user
 
 
+def get_admin_or_establecimiento_user(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Permite ADMIN o rol establecimiento (ej. staff validando un QR en el
+    punto de canje). No valida pertenencia a un establecimiento específico
+    (establecimiento_usuarios) — el módulo Comercial aún no expone esa
+    relación vía endpoint; cuando exista, este chequeo debería restringirse
+    al establecimiento dueño de la recompensa/POI involucrado."""
+    rol = get_role_nombre(current_user, db)
+    if rol not in ("admin", "establecimiento"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requieren permisos de administrador o establecimiento")
+    return current_user
+
+
 def get_current_user_con_flag_admin(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),

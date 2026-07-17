@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha1
 from typing import List, Optional
 from uuid import UUID
@@ -9,24 +9,30 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import (
+    ConflictError,
     DBError,
     InternalServiceError,
     PuntosInsuficientesError,
     RecordNotFoundError,
     SinStockError,
 )
+from app.models.canje import Canje
 from app.models.gamificacion import Recompensa
 from app.models.poi import Poi
+from app.models.usuario import Usuario
 from app.repositories.canje_repository import CanjeRepository
 from app.repositories.movimiento_puntos_repository import MovimientoPuntosRepository
 from app.repositories.puntos_repository import PuntosRepository
 from app.repositories.recompensa_repository import RecompensaRepository
 from app.schemas.gamificacion import (
     CanjeOut,
+    CanjeValidacionOut,
+    PaginatedCanjesResponse,
     RecompensaCreate,
     RecompensaOut,
     RecompensaUpdate,
 )
+from app.schemas.social import UsuarioMini
 from app.utils.qr import generar_qr_canje
 
 # Vigencia de un canje una vez emitido.
@@ -246,5 +252,76 @@ class RecompensasService:
             codigo_qr=canje.codigo_qr,
             estado=canje.estado,
             fecha_expira=canje.fecha_expira,
+            created_at=canje.created_at,
+        )
+
+    def listar_mis_canjes(self, usuario_id: str, skip: int, limit: int, page: int) -> PaginatedCanjesResponse:
+        """Historial paginado de canjes del usuario autenticado, más reciente primero."""
+        canjes = self.canje_repo.listar_por_usuario(usuario_id, skip=skip, limit=limit)
+        total = self.canje_repo.contar_por_usuario(usuario_id)
+        items = [self._canje_a_out(c) for c in canjes]
+        return PaginatedCanjesResponse(items=items, total=total, page=page, page_size=limit)
+
+    def obtener_canje(self, id: str, current_user: Usuario, is_admin: bool) -> CanjeValidacionOut:
+        """Detalle de un canje. Solo el dueño o un ADMIN (ver nota sobre
+        alcance de ESTABLECIMIENTO en get_admin_or_establecimiento_user)."""
+        canje = self.canje_repo.obtener_por_id(id)
+        if canje is None:
+            raise RecordNotFoundError(f"Canje with id {id} not found")
+        if not is_admin and str(canje.usuario_id) != str(current_user.id):
+            # 404, no 403: no revelar que el canje existe si no es tuyo (mismo
+            # criterio que GET /poi/{id} con un POI no publicado).
+            raise RecordNotFoundError(f"Canje with id {id} not found")
+        return self._canje_a_validacion_out(canje)
+
+    def validar_qr(self, codigo_qr: str) -> CanjeValidacionOut:
+        """Redime un canje presentado físicamente por su codigo_qr. Solo
+        ADMIN/ESTABLECIMIENTO llegan aquí (autorización en el router).
+        PENDIENTE -> REDIMIDO, o marca EXPIRADO de forma perezosa si ya venció."""
+        canje = self.canje_repo.obtener_por_codigo_qr(codigo_qr)
+        if canje is None:
+            raise RecordNotFoundError("Código QR no encontrado")
+
+        if canje.estado == "PENDIENTE" and canje.fecha_expira is not None:
+            if datetime.now(timezone.utc) > canje.fecha_expira:
+                self.canje_repo.actualizar(canje, {"estado": "EXPIRADO"})
+                self.db.commit()
+                raise ConflictError("Este código ya expiró")
+
+        if canje.estado != "PENDIENTE":
+            estado_legible = "redimido" if canje.estado == "REDIMIDO" else "expirado"
+            raise ConflictError(f"Este código ya fue {estado_legible}")
+
+        self.canje_repo.actualizar(
+            canje, {"estado": "REDIMIDO", "fecha_redencion": datetime.now(timezone.utc)}
+        )
+        self.db.commit()
+        self.db.refresh(canje)
+
+        return self._canje_a_validacion_out(canje)
+
+    def _canje_a_out(self, canje: Canje) -> CanjeOut:
+        recompensa = self.recompensa_repo.obtener_por_id(str(canje.recompensa_id))
+        return CanjeOut(
+            id=canje.id,
+            recompensa=_to_out(recompensa),
+            origen=canje.origen,
+            codigo_qr=canje.codigo_qr,
+            estado=canje.estado,
+            fecha_expira=canje.fecha_expira,
+            created_at=canje.created_at,
+        )
+
+    def _canje_a_validacion_out(self, canje: Canje) -> CanjeValidacionOut:
+        recompensa = self.recompensa_repo.obtener_por_id(str(canje.recompensa_id))
+        usuario = self.db.query(Usuario).filter(Usuario.id == canje.usuario_id).first()
+        return CanjeValidacionOut(
+            id=canje.id,
+            recompensa=_to_out(recompensa),
+            usuario=UsuarioMini.model_validate(usuario),
+            origen=canje.origen,
+            estado=canje.estado,
+            fecha_expira=canje.fecha_expira,
+            fecha_redencion=canje.fecha_redencion,
             created_at=canje.created_at,
         )
