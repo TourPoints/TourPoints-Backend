@@ -25,7 +25,7 @@ class RecordNotFoundErrorHandler(BaseExceptionHandler):
         return JSONResponse(
             status_code=404,
             content={
-                "detail": str(exc)
+                "detail": exc.detail
             }
         )
 
@@ -36,7 +36,7 @@ class DBErrorHandler(BaseExceptionHandler):
             status_code=500,
             content={
                 "details": "Database error occurred",
-                "error": str(exc)
+                "error": exc.detail
             }
         )
 
