@@ -8,5 +8,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app:z
+      - .:/app
+    user: root
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - default
+      - npm_network
+
+networks:
+  npm_network:
+    external: true
