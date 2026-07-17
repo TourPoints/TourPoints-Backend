@@ -4,6 +4,7 @@ from fastapi.openapi.docs import get_redoc_html
 
 from app.core.exception_handlers import register_exception_handlers
 from app.core.middleware import JWTMiddleware
+from app.core.scheduler import detener_scheduler, iniciar_scheduler
 from app.routers import auth, canjes, catalogos, comercial, poi, puntos, recompensas, retos, social, usuarios, visitas
 from os import getenv
 
@@ -64,3 +65,15 @@ def maybe_seed_roles_on_startup():
                 seed_roles()
             except Exception:
                 pass
+
+
+@app.on_event("startup")
+def iniciar_jobs_periodicos():
+    """Neon no permite pg_cron (ver app/core/scheduler.py) — scheduler in-process
+    como alternativa mientras el despliegue sea un único contenedor/proceso."""
+    iniciar_scheduler()
+
+
+@app.on_event("shutdown")
+def detener_jobs_periodicos():
+    detener_scheduler()
