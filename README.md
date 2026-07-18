@@ -8,9 +8,11 @@ Este repositorio es **solo el backend**. El frontend vive en otro repositorio.
 
 - **FastAPI** — framework de la API.
 - **SQLAlchemy** + **Alembic** — ORM y migraciones.
-- **PostgreSQL (Neon)** — base de datos. Requiere la extensión **PostGIS** (los POIs se ubican con tipos geográficos).
+- **PostgreSQL (Neon)** — base de datos. Requiere la extensión **PostGIS** (los POIs se ubican con tipos geográficos, `Geography(Point,4326)`).
 - **python-jose** + **passlib** — autenticación propia por JWT (no se usa Neon Auth en esta etapa).
-- **pytest** — tests.
+- **Cloudinary** — almacenamiento de imágenes (fotos de POI y de perfil de usuario). La BD solo guarda la URL, nunca el binario.
+- **APScheduler** — job periódico in-process (expira intentos de reto vencidos cada hora). Ver [`app/core/scheduler.py`](app/core/scheduler.py) y la nota sobre `pg_cron` más abajo.
+- **pytest** — tests. ⚠️ **borran todos los datos** de la base configurada en `DATABASE_URL` al arrancar (no hay base de test separada) — ver sección [Tests](#tests) antes de correrlos.
 
 ## Arquitectura
 
@@ -30,8 +32,9 @@ Router (FastAPI)  →  Service            →  Repository        →  Model (SQL
 - `app/models/` — mapeo ORM, un archivo por dominio (no por tabla).
 - `app/schemas/` — DTOs Pydantic para request/response.
 - `app/auth/` — hashing de password, creación/validación de JWT.
-- `app/core/` — excepciones de dominio y sus handlers HTTP.
-- `app/utils/` — helpers (`geo.py` para validar distancia GPS, `qr.py` para códigos de canje).
+- `app/core/` — excepciones de dominio, sus handlers HTTP, y el scheduler de jobs periódicos.
+- `app/utils/` — helpers (`geo.py` para distancia GPS, `qr.py` para códigos de canje y check-in, `media.py` para validación de imágenes).
+- `app/scripts/` — seeds ejecutables una vez (`seed_roles.py`, `seed_tipos_relacion_poi.py`, `seed_insignias.py`) para poblar catálogos base en un entorno nuevo.
 
 ## Requisitos previos
 
@@ -52,7 +55,10 @@ Router (FastAPI)  →  Service            →  Repository        →  Model (SQL
    | `DATABASE_URL` | Connection string de Postgres (Neon → Dashboard → Connection Details) |
    | `SECRET_KEY` | Clave para firmar los JWT. Genera una propia: `openssl rand -hex 32` — **nunca reutilices la del ejemplo** |
    | `ALGORITHM` | Algoritmo de firma del JWT (`HS256` por defecto) |
-   | `ACCESS_TOKEN_EXPIRE_MINUTES` | Minutos de validez del token (`60` por defecto) |
+   | `ACCESS_TOKEN_EXPIRE_MINUTES` | Minutos de validez del token (`60` por defecto). No hay refresh token todavía — al expirar, el cliente debe volver a hacer login |
+   | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Credenciales de Cloudinary (Dashboard → Account Details). **Obligatorias** — `app/config.py` no tiene default para estas tres, la app no arranca sin ellas |
+
+   Todas las variables son requeridas salvo que el default esté indicado arriba — `Settings` en `app/config.py` es la fuente de verdad si hay dudas.
 
    `.env` está en `.gitignore` — nunca se commitea. `.env.example` sí se commitea y **no** debe tener secretos reales.
 
@@ -89,14 +95,30 @@ Con la app corriendo (por cualquiera de los dos métodos):
 
 Todas las rutas de negocio cuelgan del prefijo `/api/v1`.
 
+Documentación más profunda en `doc/`:
+
+| Archivo | Qué cubre |
+|---|---|
+| [`doc/endpoints_api.md`](doc/endpoints_api.md) | **Contrato completo de la API** — todos los endpoints implementados, con auth, body, response real y notas de qué difiere del diseño original. Es la referencia más actualizada y detallada; ante cualquier duda sobre un endpoint, empezar acá. |
+| [`doc/auth_usuarios_api.md`](doc/auth_usuarios_api.md) | Detalle fino de `/auth` y `/users` (claims del JWT, reglas de cada campo, cobertura de tests). |
+| [`doc/logica_negocio.md`](doc/logica_negocio.md) | Qué hace cada tabla, qué invariantes garantiza la base de datos (`CHECK`s, triggers, columnas generadas) y cómo fluyen los procesos de negocio de punta a punta — **no describe endpoints**, es el modelo de datos puro. |
+| [`doc/schem_posgrest.sql`](doc/schem_posgrest.sql) | El DDL completo de referencia (33 tablas, triggers, vistas). |
+| [`doc/guia_orm_alembic.md`](doc/guia_orm_alembic.md) | Cómo trabajar con SQLAlchemy + Alembic en este proyecto: comandos, flujo para modificar el schema, errores comunes. |
+
 ## Migraciones (Alembic)
 
-El proyecto tiene la carpeta `alembic/` scaffolded pero **Alembic todavía no está inicializado** (`alembic.ini` y `alembic/env.py` están vacíos). Antes de generar la primera migración hay que:
+Alembic está inicializado y conectado a `Base.metadata` (`app/database.py`) y a `DATABASE_URL` (`app/config.py`). Migraciones aplicadas hoy en la base real:
 
-1. Inicializar `alembic/env.py` para que use `Base.metadata` de `app/database.py` y lea `DATABASE_URL` desde `app/config.py`.
-2. Generar la revisión inicial reflejando el schema del proyecto (no partir de cero con `--autogenerate` si ya existe un DDL de referencia).
+1. `dd9d1878d96d` — esquema inicial (todas las tablas de `doc/schem_posgrest.sql`).
+2. `5e0ac9f7b8ed` — tabla de auditoría `poi_moderaciones`.
 
-Una vez configurado, el flujo normal es:
+Ver el estado real de la base:
+
+```bash
+alembic current
+```
+
+Flujo normal para un cambio de schema (detallado con ejemplos en [`doc/guia_orm_alembic.md`](doc/guia_orm_alembic.md)):
 
 ```bash
 alembic revision --autogenerate -m "descripción del cambio"
@@ -111,6 +133,12 @@ pytest
 
 (requiere tener el entorno virtual activado y las dependencias instaladas, ver sección "sin Docker" arriba)
 
+⚠️ **`pytest` borra todos los datos de la base configurada en `DATABASE_URL`.** No hay una base de test separada — la suite corre contra la misma Neon real de `.env`. El fixture `_schema` (session-scoped, autouse, en `tests/conftest.py`) ejecuta `TRUNCATE {tabla} CASCADE` sobre **las 33 tablas del schema, una sola vez al arrancar la sesión de tests**, antes de que corra un solo test. Después de ese truncado inicial, cada test individual sí queda aislado (el fixture `db` corre dentro de una transacción con `rollback()` al final, así que lo que crea un test no lo ve el siguiente) — pero ese primer `TRUNCATE` es real e irreversible. **Nunca corras `pytest` apuntando `DATABASE_URL` a una base con datos que te importen.** Si necesitás correr los tests, usá una base descartable (una branch de Neon, por ejemplo) — nunca la de desarrollo compartida.
+
 ## Estado actual
 
-Este backend está en construcción activa. La arquitectura (capas, Docker, auth JWT) ya está resuelta; los endpoints de negocio (POIs, visitas, recompensas, canjes, puntos) se están implementando módulo por módulo siguiendo el mismo patrón Router → Service → Repository.
+Todos los módulos de negocio del diseño original están implementados y probados end-to-end contra la base real: catálogos (países/departamentos/ciudades/categorías), POI (con moderación, imágenes y check-in QR), usuarios (con foto de perfil), social (calificaciones/comentarios/favoritos), visitas (GPS/QR/MIXTA), recompensas y canjes (con validación QR física), comercial (establecimientos/compras/promociones, con autorización real por pertenencia), retos (plantillas, inscripción, progreso, rachas, hitos, insignias) y puntos (historial del ledger).
+
+El detalle endpoint por endpoint, incluidas las decisiones que no estaban en el diseño original y los gaps conocidos, vive en [`doc/endpoints_api.md`](doc/endpoints_api.md) — ese documento es la fuente de verdad más actualizada, más que este README.
+
+Pendiente conocido, no bloqueante: el tracking punto-a-punto en vivo de los retos tipo `RECORRIDO` (`sesiones_reto` solo guarda el marco inicio/fin/estado, sin coordenadas — el diseño original lo pensaba con Redis, todavía no implementado).
