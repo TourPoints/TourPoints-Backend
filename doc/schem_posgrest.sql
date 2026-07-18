@@ -58,6 +58,12 @@
 --      fn_otorgar_recompensa_hito) descuenta stock atómicamente si hay,
 --      y si no, registra el logro igual sin premio físico (mismo
 --      patrón "nunca bloquear" que ya usan retos/canjes).
+--  15. poi_moderaciones agregada (migración de Alembic 5e0ac9f7b8ed,
+--      2026-07-16): auditoría append-only de cada transición de estado
+--      de un POI (quién, cuándo, de qué a qué, por qué). No estaba en
+--      esta revisión original del DDL; se sincronizó acá después de
+--      confirmar que la tabla real en Neon y el modelo ORM
+--      (PoiModeracionLog) ya coincidían entre sí.
 --
 -- Pendiente de decisión con el equipo (NO aplicado en esta revisión):
 --   - poi_estado_enum se reutiliza en establecimientos/promociones/
@@ -210,6 +216,25 @@ CREATE TABLE poi (
 CREATE TRIGGER trg_poi_updated_at
     BEFORE UPDATE ON poi
     FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+
+-- Auditoría de moderación: cada transición de estado de un POI (enviar a
+-- revisión, aprobar/rechazar/activar/inactivar por un ADMIN, o reintentar
+-- tras un rechazo) queda registrada acá. Append-only, igual que
+-- poi_relaciones — no se actualiza ni se borra una fila existente.
+-- No estaba en el DDL original: se agregó vía la migración de Alembic
+-- 5e0ac9f7b8ed (2026-07-16), fuera del diseño inicial documentado en este
+-- archivo, y quedó sin reflejarse acá hasta ahora.
+CREATE TABLE poi_moderaciones (
+    id              BIGSERIAL PRIMARY KEY,
+    poi_id          UUID NOT NULL REFERENCES poi(id) ON DELETE CASCADE,
+    usuario_id      UUID NOT NULL REFERENCES usuarios(id),
+    estado_anterior poi_estado_enum NOT NULL,
+    estado_nuevo    poi_estado_enum NOT NULL,
+    motivo          TEXT, -- opcional; solo se usa normalmente al rechazar
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_poi_moderaciones_poi ON poi_moderaciones (poi_id);
 
 
 -- =========================================================

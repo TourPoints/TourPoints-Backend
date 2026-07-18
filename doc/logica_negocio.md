@@ -85,6 +85,8 @@ Es el corazón del dominio. Todo POI:
 
 **Regla de negocio:** solo un POI en estado `APROBADO` debería ser visible públicamente (esto lo aplicará la política RLS cuando se implemente — ver memoria de roles/RLS — hoy no hay ninguna restricción de visibilidad a nivel de base de datos).
 
+**Auditoría de moderación (`poi_moderaciones`):** tabla agregada después de esta revisión original del schema (migración de Alembic `5e0ac9f7b8ed`), no reflejada acá hasta ahora. Registra cada transición de estado del POI — `poi_id`, `usuario_id` que la disparó, `estado_anterior`, `estado_nuevo`, `motivo` opcional, `created_at` — sea que la dispare el dueño (enviar a revisión, reintentar tras un rechazo) o un ADMIN (aprobar/rechazar/activar/inactivar). Es append-only: nunca se actualiza ni se borra una fila, igual que `poi_relaciones`. `ON DELETE CASCADE` hacia `poi` (si el POI se borra físicamente, su historial de auditoría se va con él — igual criterio que el contenido social del módulo 6-9, no el de un ledger).
+
 ---
 
 ## Módulo 5 — Relaciones entre POIs
