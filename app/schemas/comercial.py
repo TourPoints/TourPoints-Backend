@@ -9,7 +9,7 @@ from app.models.enums import CompraEstado, Moneda, PoiEstado
 
 
 class EstablecimientoCreate(BaseModel):
-    """Body de POST /businesses. Requiere un POI propio ya creado."""
+    """Body for POST /businesses. Requires an already-created POI you own."""
 
     poi_id: UUID
     nit: Optional[str] = Field(None, max_length=30)
@@ -31,7 +31,7 @@ class EstablecimientoOut(BaseModel):
 
 
 class EstablecimientoMeItem(BaseModel):
-    """Igual a EstablecimientoOut, más `cargo` (viene de establecimiento_usuarios)."""
+    """Same as EstablecimientoOut, plus `cargo` (comes from establecimiento_usuarios)."""
 
     id: UUID
     poi_id: UUID
@@ -55,7 +55,7 @@ class EstablecimientoModeracion(BaseModel):
 
 
 class CompraCreate(BaseModel):
-    """Body de POST /businesses/{id}/purchases."""
+    """Body for POST /businesses/{id}/purchases."""
 
     usuario_id: UUID
     valor: Decimal = Field(..., gt=0)
@@ -76,7 +76,7 @@ class CompraOut(BaseModel):
 
 
 class PromocionCreate(BaseModel):
-    """Body de POST /businesses/{id}/promotions. `CHECK (fin > inicio)` en BD, validado también aquí."""
+    """Body for POST /businesses/{id}/promotions. `CHECK (fin > inicio)` in the DB, also validated here."""
 
     titulo: str = Field(..., min_length=1, max_length=200)
     descripcion: Optional[str] = None

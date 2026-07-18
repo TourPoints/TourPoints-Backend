@@ -12,7 +12,7 @@ router = APIRouter(tags=["auth"])
 
 @router.post("/register", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
 def register_user(usuario: UsuarioCreate, db: Session = Depends(get_db)):
-    """Registra un nuevo usuario con rol por defecto y contraseña cifrada."""
+    """Registers a new user with the default role and a hashed password."""
     existing_user = db.query(Usuario).filter(Usuario.email == usuario.email).first()
     if existing_user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El email ya está registrado")
@@ -35,7 +35,7 @@ def register_user(usuario: UsuarioCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login_user(usuario: UsuarioLogin, db: Session = Depends(get_db)):
-    """Autentica al usuario y devuelve un token JWT de acceso."""
+    """Authenticates the user and returns a JWT access token."""
     db_user = db.query(Usuario).filter(Usuario.email == usuario.email).filter(Usuario.deleted_at.is_(None)).first()
     if not db_user:
         raise CredentialsException("Credenciales inválidas")

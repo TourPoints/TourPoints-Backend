@@ -32,10 +32,10 @@ def get_poi_service(db: Session = Depends(get_db)) -> PoiService:
 
 @router.get("", response_model=PaginatedPoiResponse)
 def list_pois(
-    nombre: Optional[str] = Query(None, description="Búsqueda por nombre"),
+    nombre: Optional[str] = Query(None, description="Search by name"),
     categoria_id: Optional[int] = Query(None),
     ciudad_id: Optional[int] = Query(None),
-    estado: Optional[str] = Query(None, description="Solo ADMIN puede filtrar por estado"),
+    estado: Optional[str] = Query(None, description="Only ADMIN can filter by status"),
     lat: Optional[float] = Query(None),
     lng: Optional[float] = Query(None),
     radio_metros: Optional[float] = Query(None, gt=0),
@@ -45,7 +45,7 @@ def list_pois(
     current_user: Optional[Usuario] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
-    """Lista POI. Público: solo ve `estado=APROBADO`. ADMIN puede filtrar por cualquier estado."""
+    """Lists POIs. Public: only sees `estado=APROBADO`. ADMIN can filter by any status."""
     filters = {
         "nombre": nombre,
         "categoria_id": categoria_id,
@@ -70,7 +70,7 @@ def get_poi(
     current_user: Optional[Usuario] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
-    """Detalle de un POI. Si no está APROBADO, solo lo ve el dueño o un ADMIN."""
+    """POI detail. If not APROBADO, only the owner or an ADMIN can see it."""
     return service.get_poi(str(poi_id), current_user, is_admin_user(current_user, db))
 
 
@@ -81,7 +81,7 @@ def create_poi(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Crea un POI en estado BORRADOR. La `fuente` se resuelve por el rol del token, no la envía el front."""
+    """Creates a POI in BORRADOR status. `fuente` is resolved from the token's role, not sent by the frontend."""
     return service.create_poi(poi_data, current_user, get_role_nombre(current_user, db))
 
 
@@ -93,7 +93,7 @@ def update_poi(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Actualiza un POI (parcial). Solo el dueño o un ADMIN."""
+    """Updates a POI (partial). Owner or ADMIN only."""
     return service.update_poi(str(poi_id), poi_data, current_user, is_admin_user(current_user, db))
 
 
@@ -104,7 +104,7 @@ def enviar_revision(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Transición BORRADOR -> PENDIENTE. Solo el dueño o un ADMIN."""
+    """Transitions BORRADOR -> PENDIENTE. Owner or ADMIN only."""
     return service.enviar_revision(str(poi_id), current_user, is_admin_user(current_user, db))
 
 
@@ -115,7 +115,7 @@ def moderar_poi(
     service: PoiService = Depends(get_poi_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Aprueba/rechaza/activa un POI. Solo ADMIN. Cada transición queda en el historial de auditoría."""
+    """Approves/rejects/activates a POI. ADMIN only. Every transition is recorded in the audit log."""
     return service.moderar(str(poi_id), data, admin_user)
 
 
@@ -126,7 +126,7 @@ def reintentar_poi(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Transición RECHAZADO -> BORRADOR, para corregir y reenviar a revisión. Solo el dueño o un ADMIN."""
+    """Transitions RECHAZADO -> BORRADOR, to fix and resubmit for review. Owner or ADMIN only."""
     return service.reintentar(str(poi_id), current_user, is_admin_user(current_user, db))
 
 
@@ -137,7 +137,7 @@ def get_poi_moderaciones(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Historial de auditoría de cambios de estado del POI. Solo el dueño o un ADMIN."""
+    """Audit history of the POI's status changes. Owner or ADMIN only."""
     return service.get_moderacion_historial(str(poi_id), current_user, is_admin_user(current_user, db))
 
 
@@ -148,8 +148,8 @@ def get_poi_qr_code(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Código QR de check-in del POI, para imprimir/mostrar en el sitio y usar
-    en POST /visits con metodo_validacion=QR o MIXTA. Solo el dueño o un ADMIN."""
+    """POI check-in QR code, to print/display on-site and use
+    in POST /visits with metodo_validacion=QR or MIXTA. Owner or ADMIN only."""
     return service.get_qr_code(str(poi_id), current_user, is_admin_user(current_user, db))
 
 
@@ -160,7 +160,7 @@ def delete_poi(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Elimina (soft delete) un POI. Solo el dueño o un ADMIN."""
+    """Deletes (soft delete) a POI. Owner or ADMIN only."""
     service.delete_poi(str(poi_id), current_user, is_admin_user(current_user, db))
     return None
 
@@ -174,7 +174,7 @@ def add_poi_imagen(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Sube una imagen a Cloudinary y la asocia al POI. Solo el dueño o un ADMIN."""
+    """Uploads an image to Cloudinary and links it to the POI. Owner or ADMIN only."""
     return service.add_imagen(str(poi_id), file, principal, current_user, is_admin_user(current_user, db))
 
 
@@ -187,7 +187,7 @@ def update_poi_imagen(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Cambia `principal` y/o `orden` de una imagen ya subida, sin resubir el archivo. Solo el dueño o un ADMIN."""
+    """Changes `principal` and/or `orden` of an already-uploaded image, without re-uploading the file. Owner or ADMIN only."""
     return service.update_imagen(str(poi_id), imagen_id, data, current_user, is_admin_user(current_user, db))
 
 
@@ -199,7 +199,7 @@ def delete_poi_imagen(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Borra una imagen del POI (fila + asset en Cloudinary). Si era la
-    principal, promueve automáticamente la de menor orden. Solo el dueño o un ADMIN."""
+    """Deletes an image from the POI (row + Cloudinary asset). If it was the
+    principal image, automatically promotes the one with the lowest `orden`. Owner or ADMIN only."""
     service.delete_imagen(str(poi_id), imagen_id, current_user, is_admin_user(current_user, db))
     return None

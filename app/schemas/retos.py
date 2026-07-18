@@ -8,7 +8,7 @@ from app.models.enums import RetoEstado, RetoModoRecompensa, RetoRecurrencia, Re
 
 
 class RetoCreate(BaseModel):
-    """Body de POST /challenges."""
+    """Body for POST /challenges."""
 
     nombre: str = Field(..., min_length=1, max_length=200)
     descripcion: Optional[str] = None
@@ -18,7 +18,7 @@ class RetoCreate(BaseModel):
     recompensa_id: Optional[UUID] = None
     modo_recompensa: RetoModoRecompensa = RetoModoRecompensa.SIN_RECOMPENSA
     establecimiento_id: Optional[UUID] = Field(
-        None, description="Requerido si lo propone un establecimiento (no-ADMIN); ADMIN puede omitirlo"
+        None, description="Required if proposed by a business (non-ADMIN); ADMIN can omit it"
     )
     inicio: datetime
     fin: Optional[datetime] = None
@@ -100,11 +100,11 @@ class PaginatedUsuarioRetosResponse(BaseModel):
 
 
 class RetoProgressUpdate(BaseModel):
-    """Body de POST /challenges/{id}/progress. No estaba en el diseño original:
-    sin esto, nada podía mover `progreso`/`cantidad` hacia adelante."""
+    """Body for POST /challenges/{id}/progress. Not in the original design:
+    without this, nothing could move `progreso`/`cantidad` forward."""
 
     incremento: int = Field(1, gt=0)
-    detalle: Optional[str] = Field(None, description="Identificador libre de qué generó el avance (ej. un poi_id)")
+    detalle: Optional[str] = Field(None, description="Free-form identifier of what generated the progress (e.g. a poi_id)")
 
 
 class SesionRetoCreate(BaseModel):

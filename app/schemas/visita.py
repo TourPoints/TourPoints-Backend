@@ -15,21 +15,21 @@ _POINT_RE = re.compile(
 
 
 class VisitaCreate(BaseModel):
-    """Solicitud de check-in. Las coordenadas usan el orden WKT: longitud latitud.
+    """Check-in request. Coordinates use WKT order: longitude latitude.
 
-    Qué campos son obligatorios depende de `metodo_validacion`:
+    Which fields are required depends on `metodo_validacion`:
     - GPS: `ubicacion_usuario` + `precision_metros`.
-    - QR: `codigo_qr` (el código físico del POI, ver GET /poi/{id}/qr-code).
-    - MIXTA: los tres, se valida GPS y QR a la vez.
+    - QR: `codigo_qr` (the POI's physical code, see GET /poi/{id}/qr-code).
+    - MIXTA: all three; both GPS and QR are validated together.
     """
 
     poi_id: UUID
     metodo_validacion: MetodoValidacion = MetodoValidacion.GPS
     ubicacion_usuario: Optional[str] = Field(
-        None, examples=["POINT(-74.08175 4.60971)"], description="WKT POINT(longitud latitud)"
+        None, examples=["POINT(-74.08175 4.60971)"], description="WKT POINT(longitude latitude)"
     )
     precision_metros: Optional[float] = Field(None, ge=0, le=1_000)
-    codigo_qr: Optional[str] = Field(None, description="Código QR físico del POI")
+    codigo_qr: Optional[str] = Field(None, description="POI's physical QR code")
 
     @field_validator("ubicacion_usuario")
     @classmethod

@@ -22,12 +22,12 @@ def get_catalogo_service(db: Session = Depends(get_db)) -> CatalogoService:
 
 @router.get("/countries", response_model=PaginatedPaisesResponse)
 def list_paises(
-    q: Optional[str] = Query(None, description="Búsqueda por nombre de país"),
+    q: Optional[str] = Query(None, description="Search by country name"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     service: CatalogoService = Depends(get_catalogo_service),
 ):
-    """Catálogo de países. Público, de solo lectura."""
+    """Catalog of countries. Public, read-only."""
     filters = {"q": q} if q else {}
     skip = (page - 1) * page_size
     return service.list_paises(skip=skip, limit=page_size, page=page, **filters)
@@ -36,12 +36,12 @@ def list_paises(
 @router.get("/departments", response_model=PaginatedDepartamentosResponse)
 def list_departamentos(
     pais_id: Optional[int] = Query(None),
-    q: Optional[str] = Query(None, description="Búsqueda por nombre de departamento"),
+    q: Optional[str] = Query(None, description="Search by department name"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     service: CatalogoService = Depends(get_catalogo_service),
 ):
-    """Catálogo de departamentos. Público, de solo lectura. Filtra por `pais_id` para el combo país→departamento→ciudad."""
+    """Catalog of departments (states/provinces). Public, read-only. Filter by `pais_id` for the country→department→city cascade."""
     filters = {"pais_id": pais_id, "q": q}
     filters = {k: v for k, v in filters.items() if v is not None}
     skip = (page - 1) * page_size
@@ -52,12 +52,12 @@ def list_departamentos(
 def list_ciudades(
     departamento_id: Optional[int] = Query(None),
     pais_id: Optional[int] = Query(None),
-    q: Optional[str] = Query(None, description="Búsqueda por nombre de ciudad"),
+    q: Optional[str] = Query(None, description="Search by city name"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     service: CatalogoService = Depends(get_catalogo_service),
 ):
-    """Catálogo de ciudades. Público, de solo lectura."""
+    """Catalog of cities. Public, read-only."""
     filters = {"departamento_id": departamento_id, "pais_id": pais_id, "q": q}
     filters = {k: v for k, v in filters.items() if v is not None}
     skip = (page - 1) * page_size
@@ -70,6 +70,6 @@ def list_categorias_poi(
     page_size: int = Query(20, ge=1, le=100),
     service: CatalogoService = Depends(get_catalogo_service),
 ):
-    """Catálogo de categorías de POI. Público, de solo lectura."""
+    """Catalog of POI categories. Public, read-only."""
     skip = (page - 1) * page_size
     return service.list_categorias(skip=skip, limit=page_size, page=page)

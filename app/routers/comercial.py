@@ -36,8 +36,8 @@ def create_business(
     service: ComercialService = Depends(get_comercial_service),
     user_admin: tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
-    """Registra un establecimiento sobre un POI propio ya APROBADO. Nace en estado PENDIENTE
-    (requiere aprobación de un ADMIN) y te registra automáticamente como dueño."""
+    """Registers a business on top of your own, already-APROBADO POI. Starts out PENDIENTE
+    (requires ADMIN approval) and automatically registers you as its owner."""
     current_user, es_admin = user_admin
     return service.crear_establecimiento(data, current_user, es_admin)
 
@@ -49,7 +49,7 @@ def list_my_businesses(
     service: ComercialService = Depends(get_comercial_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Lista los establecimientos que administras (incluye tu `cargo` en cada uno)."""
+    """Lists the businesses you manage (includes your `cargo` in each one)."""
     skip = (page - 1) * page_size
     return service.listar_mis_establecimientos(str(current_user.id), skip=skip, limit=page_size, page=page)
 
@@ -61,7 +61,7 @@ def moderate_business(
     service: ComercialService = Depends(get_comercial_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Aprueba/rechaza/activa un establecimiento. Solo ADMIN."""
+    """Approves/rejects/activates a business. ADMIN only."""
     return service.moderar_establecimiento(str(business_id), data.estado)
 
 
@@ -75,8 +75,8 @@ def create_purchase(
     service: ComercialService = Depends(get_comercial_service),
     user_admin: tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
-    """Registra la compra de un cliente en el punto de venta. Solo staff del
-    establecimiento (`establecimiento_usuarios`) o ADMIN. Acredita puntos según `reglas_puntos`."""
+    """Registers a customer's purchase at the point of sale. Only business staff
+    (`establecimiento_usuarios`) or ADMIN. Credits points according to `reglas_puntos`."""
     current_user, es_admin = user_admin
     return service.registrar_compra(str(business_id), data, current_user, es_admin)
 
@@ -87,8 +87,8 @@ def cancel_purchase(
     service: ComercialService = Depends(get_comercial_service),
     user_admin: tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
-    """Cancela una compra registrada. Revierte los puntos otorgados con un
-    movimiento negativo compensatorio (el ledger nunca se edita/borra)."""
+    """Cancels a registered purchase. Reverses the points awarded with a
+    compensating negative entry (the ledger is never edited/deleted)."""
     current_user, es_admin = user_admin
     return service.cancelar_compra(str(purchase_id), current_user, es_admin)
 
@@ -105,8 +105,8 @@ def create_promotion(
     service: ComercialService = Depends(get_comercial_service),
     user_admin: tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
-    """Crea una promoción del establecimiento. Nace PENDIENTE, requiere aprobación de ADMIN
-    para aparecer en GET /poi/{id}/promotions. Solo staff del establecimiento o ADMIN."""
+    """Creates a business promotion. Starts out PENDIENTE, requires ADMIN approval
+    to appear in GET /poi/{id}/promotions. Only business staff or ADMIN."""
     current_user, es_admin = user_admin
     return service.crear_promocion(str(business_id), data, current_user, es_admin)
 
@@ -119,8 +119,8 @@ def moderate_promotion(
     service: ComercialService = Depends(get_comercial_service),
     user_admin: tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
-    """Aprueba/rechaza/activa una promoción. Solo ADMIN. *(no estaba en el diseño original,
-    pero sin esto una promoción se queda PENDIENTE para siempre y nunca aparece en público)*."""
+    """Approves/rejects/activates a promotion. ADMIN only. *(not in the original design,
+    but without this a promotion stays PENDIENTE forever and never becomes public)*."""
     current_user, es_admin = user_admin
     return service.moderar_promocion(str(business_id), str(promotion_id), data.estado, current_user, es_admin)
 
@@ -132,6 +132,6 @@ def list_poi_promotions(
     page_size: int = Query(20, ge=1, le=100),
     service: ComercialService = Depends(get_comercial_service),
 ):
-    """Público — promociones vigentes (APROBADO y dentro de inicio/fin) del establecimiento asociado a ese POI."""
+    """Public — active promotions (APROBADO and within start/end dates) of the business associated with that POI."""
     skip = (page - 1) * page_size
     return service.list_promociones_poi(str(poi_id), skip=skip, limit=page_size, page=page)

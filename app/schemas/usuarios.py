@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class UsuarioUpdate(BaseModel):
-    """Esquema para actualización de usuario (todos los campos opcionales)"""
+    """Schema for updating a user (all fields optional)"""
     nombre: Optional[str] = Field(None, min_length=1, max_length=50)
     apellido: Optional[str] = Field(None, min_length=1, max_length=50)
     email: Optional[EmailStr] = None
@@ -12,10 +12,10 @@ class UsuarioUpdate(BaseModel):
     foto_url: Optional[str] = None
     estado: Optional[str] = None
     configuracion: Optional[dict] = None
-    rol_id: Optional[int] = Field(None, description="Rol a asignar (solo admin puede definirlo)")
+    rol_id: Optional[int] = Field(None, description="Role to assign (only an admin can set this)")
 
 
 class ChangePasswordRequest(BaseModel):
-    """Esquema para cambio de contraseña del usuario autenticado"""
+    """Schema for changing the authenticated user's password"""
     current_password: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=8, max_length=100)

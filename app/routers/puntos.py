@@ -21,7 +21,7 @@ def list_my_points_movements(
     service: PuntosService = Depends(get_puntos_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Historial paginado del libro mayor de puntos (append-only), más reciente primero.
-    El saldo agregado vive en GET /visits/me/balance, no se duplica aquí."""
+    """Paginated history of the points ledger (append-only), most recent first.
+    The aggregated balance lives in GET /visits/me/balance, it isn't duplicated here."""
     skip = (page - 1) * page_size
     return service.listar_mis_movimientos(str(current_user.id), skip=skip, limit=page_size, page=page)

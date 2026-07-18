@@ -43,7 +43,7 @@ class ImagenPoiCreateOut(ImagenPoiOut):
 
 
 class ImagenPoiUpdate(BaseModel):
-    """Body de PATCH /poi/{id}/images/{imagen_id}. Ambos opcionales."""
+    """Body for PATCH /poi/{id}/images/{imagen_id}. Both fields optional."""
 
     principal: Optional[bool] = None
     orden: Optional[int] = Field(None, ge=0)
@@ -150,7 +150,7 @@ class PoiModeracionLogOut(BaseModel):
 
 
 class PoiQrCodeOut(BaseModel):
-    """Código para imprimir/mostrar físicamente en el POI y usar en
-    POST /visits con metodo_validacion=QR o MIXTA."""
+    """Code to print/display physically at the POI and use in
+    POST /visits with metodo_validacion=QR or MIXTA."""
 
     codigo_qr: str

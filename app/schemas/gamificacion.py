@@ -9,10 +9,10 @@ from app.schemas.social import UsuarioMini
 
 
 class RecompensaCreate(BaseModel):
-    """Body de POST /rewards. Sin estado: lo fija el service (APROBADO)."""
+    """Body for POST /rewards. No status field: the service sets it (APROBADO)."""
 
     poi_id: Optional[UUID] = Field(
-        None, description="Aliado comercial asociado; null si no depende de un POI"
+        None, description="Associated commercial partner; null if it doesn't depend on a POI"
     )
     nombre: str = Field(..., min_length=1, max_length=200)
     descripcion: Optional[str] = None
@@ -21,8 +21,8 @@ class RecompensaCreate(BaseModel):
 
 
 class RecompensaUpdate(BaseModel):
-    """Body de PATCH /rewards/{id}. Todos opcionales; estado incluido para
-    pausar (INACTIVO) sin borrar."""
+    """Body for PATCH /rewards/{id}. All fields optional; estado is included to
+    pause (INACTIVO) without deleting."""
 
     nombre: Optional[str] = Field(None, min_length=1, max_length=200)
     descripcion: Optional[str] = None
@@ -32,8 +32,8 @@ class RecompensaUpdate(BaseModel):
 
 
 class RecompensaOut(BaseModel):
-    """Salida de listar/detalle. `disponible` lo agrega el service
-    (no vive en el ORM), mismo patron que distancia_metros en POI."""
+    """List/detail output. `disponible` is added by the service
+    (it doesn't live in the ORM), same pattern as distancia_metros in POI."""
 
     id: UUID
     poi_id: Optional[UUID] = None
@@ -56,7 +56,7 @@ class PaginatedRecompensasResponse(BaseModel):
 
 
 class CanjeOut(BaseModel):
-    """Salida del canje. Recompensa embebida como RecompensaOut."""
+    """Redemption output. Reward embedded as RecompensaOut."""
 
     id: UUID
     recompensa: RecompensaOut
@@ -78,15 +78,15 @@ class PaginatedCanjesResponse(BaseModel):
 
 
 class CanjeValidateQR(BaseModel):
-    """Body de POST /redemptions/validate-qr."""
+    """Body for POST /redemptions/validate-qr."""
 
     codigo_qr: str = Field(..., min_length=1)
 
 
 class CanjeValidacionOut(BaseModel):
-    """Salida de POST /redemptions/validate-qr. Incluye `usuario` (a quién
-    pertenece el canje) y `fecha_redencion` — CanjeOut no los trae porque el
-    dueño ya sabe quién es; aquí lo necesita el staff que escanea el QR."""
+    """Output of POST /redemptions/validate-qr. Includes `usuario` (who the
+    redemption belongs to) and `fecha_redencion` — CanjeOut omits them because the
+    owner already knows who they are; here it's needed by the staff scanning the QR."""
 
     id: UUID
     recompensa: RecompensaOut

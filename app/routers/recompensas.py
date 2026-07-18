@@ -30,20 +30,20 @@ def crear_recompensa(
     service: RecompensasService = Depends(get_recompensas_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Crea una recompensa (solo admin). Estado fijo APROBADO."""
+    """Creates a reward (admin only). Status is always APROBADO."""
     return service.crear(datos)
 
 
 @router.get("", response_model=PaginatedRecompensasResponse)
 def listar_recompensas(
-    poi_id: Optional[str] = Query(None, description="Filtrar por POI (aliado)"),
-    estado: Optional[str] = Query(None, description="Filtrar por estado (solo admin ve no-APROBADO)"),
+    poi_id: Optional[str] = Query(None, description="Filter by POI (partner)"),
+    estado: Optional[str] = Query(None, description="Filter by status (only admin sees non-APROBADO)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     service: RecompensasService = Depends(get_recompensas_service),
     user_admin: Tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
-    """Lista recompensas. Usuario comun ve solo APROBADO; admin ve todo con filtro."""
+    """Lists rewards. Regular users only see APROBADO; admin sees everything, filterable."""
     _, es_admin = user_admin
     solo_aprobado = not es_admin
     skip = (page - 1) * page_size
@@ -58,7 +58,7 @@ def obtener_recompensa(
     service: RecompensasService = Depends(get_recompensas_service),
     user_admin: Tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
-    """Detalle de una recompensa. Usuario comun solo ve APROBADO."""
+    """Reward detail. Regular users only see APROBADO."""
     _, es_admin = user_admin
     solo_aprobado = not es_admin
     return service.obtener(recompensa_id, solo_aprobado=solo_aprobado)
@@ -71,7 +71,7 @@ def actualizar_recompensa(
     service: RecompensasService = Depends(get_recompensas_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Actualiza una recompensa (solo admin). PATCH parcial."""
+    """Updates a reward (admin only). Partial PATCH."""
     return service.actualizar(recompensa_id, datos)
 
 
@@ -81,5 +81,5 @@ def canjear_recompensa(
     service: RecompensasService = Depends(get_recompensas_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Canjea una recompensa por puntos (usuario autenticado). Origen=PUNTOS."""
+    """Redeems a reward with points (authenticated user). Origen=PUNTOS."""
     return service.canjear(current_user.id, recompensa_id)

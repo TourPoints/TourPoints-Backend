@@ -26,7 +26,7 @@ def create_user(
     service: UsuarioService = Depends(get_user_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Crea un nuevo usuario (solo administradores)."""
+    """Creates a new user (admin only)."""
     return service.create_user(user_data)
 
 
@@ -34,16 +34,16 @@ def create_user(
 def list_users(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    name: Optional[str] = Query(None, description="Filtrar por nombre"),
-    surname: Optional[str] = Query(None, description="Filtrar por apellido"),
-    email: Optional[str] = Query(None, description="Filtrar por email"),
-    estado: Optional[str] = Query(None, description="Filtrar por estado"),
-    rol_id: Optional[int] = Query(None, description="Filtrar por rol"),
-    include_deleted: bool = Query(False, description="Incluir usuarios eliminados"),
+    name: Optional[str] = Query(None, description="Filter by first name"),
+    surname: Optional[str] = Query(None, description="Filter by last name"),
+    email: Optional[str] = Query(None, description="Filter by email"),
+    estado: Optional[str] = Query(None, description="Filter by status"),
+    rol_id: Optional[int] = Query(None, description="Filter by role"),
+    include_deleted: bool = Query(False, description="Include deleted users"),
     service: UsuarioService = Depends(get_user_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Lista usuarios con paginación y filtros opcionales."""
+    """Lists users with pagination and optional filters."""
     filters = {}
     if name:
         filters["nombre"] = name
@@ -75,7 +75,7 @@ def count_users(
     service: UsuarioService = Depends(get_user_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Cuenta los usuarios con filtros opcionales."""
+    """Counts users with optional filters."""
     filters = {}
     if name:
         filters["nombre"] = name
@@ -95,7 +95,7 @@ def count_users(
 
 @router.get("/me", response_model=UsuarioResponse)
 def get_current_user_profile(current_user: Usuario = Depends(get_current_user)):
-    """Devuelve el perfil del usuario autenticado."""
+    """Returns the authenticated user's profile."""
     return current_user
 
 
@@ -105,7 +105,7 @@ def update_current_user_profile(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Actualiza el perfil del usuario autenticado."""
+    """Updates the authenticated user's profile."""
     update_data = user_data.model_dump(exclude_unset=True)
     update_data.pop("rol_id", None)  # el rol solo puede cambiarlo un admin vía PATCH /users/{id}
     if "email" in update_data:
@@ -132,7 +132,7 @@ def change_current_user_password(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Cambia la contraseña del usuario autenticado."""
+    """Changes the authenticated user's password."""
     if not verify_password(password_data.current_password, current_user.password_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña actual es incorrecta")
 
@@ -147,8 +147,8 @@ def upload_current_user_photo(
     service: UsuarioService = Depends(get_user_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Sube/reemplaza la foto de perfil del usuario autenticado. multipart/form-data: `file`
-    (image/jpeg, image/png o image/webp)."""
+    """Uploads/replaces the authenticated user's profile photo. multipart/form-data: `file`
+    (image/jpeg, image/png or image/webp)."""
     return service.upload_foto(str(current_user.id), file)
 
 
@@ -157,7 +157,7 @@ def delete_current_user_photo(
     service: UsuarioService = Depends(get_user_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Quita la foto de perfil del usuario autenticado (borra el asset en Cloudinary y limpia foto_url)."""
+    """Removes the authenticated user's profile photo (deletes the Cloudinary asset and clears foto_url)."""
     return service.delete_foto(str(current_user.id))
 
 
@@ -167,7 +167,7 @@ def activate_user(
     service: UsuarioService = Depends(get_user_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Activa un usuario suspendido o eliminado."""
+    """Activates a suspended or deleted user."""
     return service.activate_user(user_id)
 
 
@@ -177,7 +177,7 @@ def suspend_user(
     service: UsuarioService = Depends(get_user_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Suspende un usuario activo."""
+    """Suspends an active user."""
     return service.suspend_user(user_id)
 
 
@@ -187,7 +187,7 @@ def get_user(
     service: UsuarioService = Depends(get_user_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Obtiene un usuario por su ID."""
+    """Gets a user by ID."""
     return service.get_user(user_id)
 
 
@@ -198,17 +198,17 @@ def update_user(
     service: UsuarioService = Depends(get_user_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Actualiza un usuario existente (actualización parcial)."""
+    """Updates an existing user (partial update)."""
     return service.update_user(user_id, user_data)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: str,
-    soft: bool = Query(True, description="Eliminación suave (true) o permanente (false)"),
+    soft: bool = Query(True, description="Soft delete (true) or permanent delete (false)"),
     service: UsuarioService = Depends(get_user_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Elimina un usuario (soft delete por defecto)."""
+    """Deletes a user (soft delete by default)."""
     service.delete_user(user_id, soft=soft)
     return None

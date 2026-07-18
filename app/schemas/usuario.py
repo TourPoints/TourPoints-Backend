@@ -5,7 +5,7 @@ from uuid import UUID
 
 
 class UsuarioBase(BaseModel):
-    """Esquema base con campos comunes de usuario"""
+    """Base schema with common user fields"""
     nombre: str = Field(..., min_length=1, max_length=50)
     apellido: str = Field(..., min_length=1, max_length=50)
     email: EmailStr
@@ -13,13 +13,13 @@ class UsuarioBase(BaseModel):
 
 
 class UsuarioCreate(UsuarioBase):
-    """Esquema para creación de usuario (registro)"""
+    """Schema for creating a user (registration)"""
     password: str = Field(..., min_length=8, max_length=100)
-    rol_id: Optional[int] = Field(None, description="Rol a asignar (solo admin puede definirlo)")
+    rol_id: Optional[int] = Field(None, description="Role to assign (only an admin can set this)")
 
 
 class UsuarioResponse(UsuarioBase):
-    """Esquema para respuesta de usuario (excluye password)"""
+    """Schema for a user response (excludes password)"""
     id: UUID
     rol_id: int
     estado: str
@@ -30,11 +30,11 @@ class UsuarioResponse(UsuarioBase):
     deleted_at: Optional[datetime] = None
 
     class Config:
-        from_attributes = True  # Permite crear desde objeto ORM
+        from_attributes = True  # Allows creation from an ORM object
 
 
 class PaginatedUsuariosResponse(BaseModel):
-    """Envoltura de paginación consistente con el resto de listados (POI, ciudades, categorías)."""
+    """Pagination wrapper consistent with the rest of the listings (POI, cities, categories)."""
     items: List[UsuarioResponse]
     total: int
     page: int
@@ -42,12 +42,12 @@ class PaginatedUsuariosResponse(BaseModel):
 
 
 class UsuarioLogin(BaseModel):
-    """Esquema para login de usuario"""
+    """Schema for user login"""
     email: EmailStr
     password: str = Field(..., min_length=1)
 
 
 class Token(BaseModel):
-    """Esquema para respuesta de token"""
+    """Schema for a token response"""
     access_token: str
     token_type: str = "bearer"

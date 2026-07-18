@@ -42,7 +42,7 @@ def get_reto_service(db: Session = Depends(get_db)) -> RetoService:
 @router.get("/challenges", response_model=PaginatedRetosResponse)
 def list_challenges(
     tipo: Optional[str] = Query(None, description="VISITA|COMPRA|RECORRIDO"),
-    estado: Optional[str] = Query(None, description="Solo ADMIN puede filtrar por estado"),
+    estado: Optional[str] = Query(None, description="Only ADMIN can filter by status"),
     establecimiento_id: Optional[UUID] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -50,7 +50,7 @@ def list_challenges(
     current_user: Optional[Usuario] = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
-    """Lista retos. Público: solo ve `estado=ACTIVO`. ADMIN puede filtrar por cualquier estado."""
+    """Lists challenges. Public: only sees `estado=ACTIVO`. ADMIN can filter by any status."""
     filters = {"tipo": tipo, "estado": estado, "establecimiento_id": establecimiento_id}
     filters = {k: v for k, v in filters.items() if v is not None}
     skip = (page - 1) * page_size
@@ -64,7 +64,7 @@ def list_my_challenge_attempts(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Todos tus intentos (`usuario_retos`), todos los periodos, más reciente primero."""
+    """All of your attempts (`usuario_retos`), across all periods, most recent first."""
     skip = (page - 1) * page_size
     return service.listar_mis_intentos(str(current_user.id), skip=skip, limit=page_size, page=page)
 
@@ -74,7 +74,7 @@ def get_challenge(
     challenge_id: UUID,
     service: RetoService = Depends(get_reto_service),
 ):
-    """Detalle completo de un reto, incluida `configuracion` (JSONB libre)."""
+    """Full challenge detail, including `configuracion` (free-form JSONB)."""
     return service.get_reto(str(challenge_id))
 
 
@@ -84,8 +84,8 @@ def create_challenge(
     service: RetoService = Depends(get_reto_service),
     user_admin: Tuple[Usuario, bool] = Depends(get_current_user_con_flag_admin),
 ):
-    """Crea un reto. ADMIN nace ACTIVO; staff de un establecimiento nace BORRADOR
-    (requiere `PATCH .../moderation` de un ADMIN para activarse)."""
+    """Creates a challenge. ADMIN-created ones start ACTIVO; business-staff-created ones start BORRADOR
+    (requires an ADMIN's `PATCH .../moderation` to be activated)."""
     current_user, es_admin = user_admin
     return service.crear_reto(data, current_user, es_admin)
 
@@ -97,7 +97,7 @@ def moderate_challenge(
     service: RetoService = Depends(get_reto_service),
     admin_user: Usuario = Depends(get_admin_user),
 ):
-    """Aprueba (ACTIVO) o cancela (CANCELADO) un reto. Solo ADMIN."""
+    """Approves (ACTIVO) or cancels (CANCELADO) a challenge. ADMIN only."""
     return service.moderar_reto(str(challenge_id), data.estado)
 
 
@@ -110,8 +110,8 @@ def join_challenge(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Te inscribe en el periodo vigente del reto. Si el reto es GARANTIZADA,
-    reserva stock de la recompensa de inmediato o responde 409 si no hay."""
+    """Enrolls you in the challenge's current period. If the challenge is GARANTIZADA,
+    immediately reserves reward stock, or responds 409 if there is none."""
     return service.inscribirme(str(challenge_id), current_user)
 
 
@@ -121,9 +121,9 @@ def abandon_challenge(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """*(no estaba en el diseño original)* Cancela tu intento ACTIVO. Si el
-    reto es GARANTIZADA, libera automáticamente el stock reservado (vía
-    trigger) — sin este endpoint esa unidad quedaría atrapada para siempre."""
+    """*(not in the original design)* Cancels your ACTIVO attempt. If the
+    challenge is GARANTIZADA, automatically releases the reserved stock (via
+    trigger) — without this endpoint that unit would stay locked forever."""
     return service.abandonar(str(challenge_id), current_user)
 
 
@@ -133,7 +133,7 @@ def get_my_challenge_progress(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Tu intento ACTIVO actual para ese reto (404 si no tienes uno)."""
+    """Your current ACTIVO attempt for that challenge (404 if you don't have one)."""
     return service.obtener_mi_progreso(str(challenge_id), current_user)
 
 
@@ -144,10 +144,10 @@ def report_challenge_progress(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """*(no estaba en el diseño original)* Reporta avance sobre tu intento
-    ACTIVO. Al llegar a `cantidad_requerida`, el intento pasa a FINALIZADO:
-    se acreditan puntos, se actualiza tu racha, se otorgan hitos y se emite
-    el canje de la recompensa si el reto tiene una."""
+    """*(not in the original design)* Reports progress on your ACTIVO
+    attempt. Once `cantidad_requerida` is reached, the attempt moves to FINALIZADO:
+    points are credited, your streak is updated, milestones are awarded, and
+    the reward redemption is issued if the challenge has one."""
     return service.reportar_progreso(str(challenge_id), data, current_user)
 
 
@@ -157,7 +157,7 @@ def get_my_challenge_streak(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Racha actual/máxima del usuario en ese reto (0/0 si nunca participó)."""
+    """User's current/best streak on that challenge (0/0 if they never participated)."""
     return service.obtener_racha(str(challenge_id), current_user)
 
 
@@ -171,8 +171,8 @@ def start_challenge_session(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Inicia el marco de una sesión de tracking en vivo (el stream GPS punto-a-punto
-    vive en Redis, fuera de esta API — aquí solo se persiste inicio/fin/estado)."""
+    """Starts the frame for a live tracking session (the point-by-point GPS stream
+    lives in Redis, outside this API — only start/end/status are persisted here)."""
     return service.crear_sesion(str(challenge_id), data, current_user)
 
 
@@ -184,7 +184,7 @@ def finish_challenge_session(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Cierra una sesión de tracking."""
+    """Closes a tracking session."""
     return service.finalizar_sesion(str(challenge_id), str(session_id), data, current_user)
 
 
@@ -198,6 +198,6 @@ def list_my_badges(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Insignias que alcanzaste vía hitos de racha en cualquier reto."""
+    """Badges you earned via streak milestones on any challenge."""
     skip = (page - 1) * page_size
     return service.listar_mis_insignias(str(current_user.id), skip=skip, limit=page_size, page=page)

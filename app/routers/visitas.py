@@ -20,7 +20,7 @@ def registrar_visita(
     service: VisitasService = Depends(get_visitas_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Registra un check-in (GPS, QR o MIXTA) y acredita sus puntos."""
+    """Registers a check-in (GPS, QR, or MIXTA) and credits the corresponding points."""
     return service.registrar(str(current_user.id), datos)
 
 
@@ -31,7 +31,7 @@ def list_mis_visitas(
     service: VisitasService = Depends(get_visitas_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Historial paginado de check-ins del usuario autenticado."""
+    """Paginated check-in history for the authenticated user."""
     skip = (page - 1) * page_size
     return service.listar_mis_visitas(str(current_user.id), skip=skip, limit=page_size, page=page)
 
@@ -41,5 +41,5 @@ def obtener_mi_saldo(
     service: VisitasService = Depends(get_visitas_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Devuelve el saldo de puntos calculado desde el libro mayor."""
+    """Returns the points balance calculated from the ledger."""
     return SaldoPuntosOut(saldo=service.obtener_saldo(str(current_user.id)))
