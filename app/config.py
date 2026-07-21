@@ -2,8 +2,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    host_uid: int = 1000
-    host_gid: int = 1000
     database_url: str
     secret_key: str
     algorithm: str = "HS256"

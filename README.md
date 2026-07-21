@@ -230,6 +230,7 @@ alembic upgrade head
    | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token validity in minutes (`60` by default). No refresh token yet — once it expires, the client must log in again |
    | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Cloudinary credentials (Dashboard → Account Details). **Required** — `app/config.py` has no default for these three, the app won't start without them |
    | `REDIS_URL` | Redis connection string, used for the live GPS point tracking of `RECORRIDO` challenges. Defaults to `redis://redis:6379/0` (the Docker Compose service name) — only override it if you're running Redis somewhere else (see [Redis setup](#redis-setup) below) |
+   | `SEED_ROLES` | Optional, `false` by default. Set to `true`/`1`/`yes` to seed the base roles (`admin`/`usuario`/`establecimiento`) on startup — useful against a fresh database whose `roles` table is still empty |
 
    `.env` is in `.gitignore` — it's never committed. `.env.example` is committed and **must not** contain real secrets.
 
