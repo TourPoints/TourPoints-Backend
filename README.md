@@ -333,14 +333,3 @@ This project fulfills:
 ✔ Backend best practices with FastAPI
 ✔ Complete technical documentation (API, business logic, database schema)
 
----
-
-## 👨‍💻 Author
-
-**Juan Andrés Henríquez**
-Developer Riwi
-Clan Cortissoz
-
----
-
-💡 *"A backend shouldn't just work — it should correctly model the business rules."*
