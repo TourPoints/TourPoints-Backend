@@ -144,7 +144,7 @@ Router (FastAPI)  →  Service            →  Repository        →  Model (SQL
 - **`app/models/`** — ORM mapping, one file per domain (not per table).
 - **`app/schemas/`** — Pydantic DTOs for request/response.
 - **`app/auth/`** — `security.py` (bcrypt hashing, JWT) and `dependencies.py` (`get_current_user`, `get_admin_user`, `get_optional_user`, etc.).
-- **`app/core/`** — `exceptions.py` + `exception_handlers.py` (domain exceptions and their HTTP handlers), `scheduler.py` (in-process periodic job), and `middleware.py` (`JWTMiddleware`, which despite the name only logs each request; actual JWT validation lives in `app/auth/dependencies.py`).
+- **`app/core/`** — `exceptions.py` + `exception_handlers.py` (domain exceptions and their HTTP handlers), `scheduler.py` (in-process periodic job), `redis_client.py` (Redis connection used for live GPS tracking), and `middleware.py` (`JWTMiddleware`, which despite the name only logs each request; actual JWT validation lives in `app/auth/dependencies.py`).
 - **`app/utils/`** — `geo.py` (GPS distance), `qr.py` (redemption and check-in codes), `media.py` (image validation).
 
 ---
@@ -158,6 +158,7 @@ Key points of the implemented business logic:
 - **Visit check-in** via GPS (distance computed with PostGIS `ST_DWithin`/`ST_Distance`), via QR (deterministic per-POI HMAC code), or `MIXTA` (both at once).
 - **Redemption QR vs. check-in QR**: reward redemption uses a random token stored in the DB; POI check-in is deterministic (HMAC) and requires no storage.
 - **Challenge gamification**: period calculation based on recurrence, streak gap detection, automatic milestone/badge awarding, and a two-phase flow on challenge completion (points/streak/milestones are confirmed even if a `LIMITADA` reward redemption fails due to stock).
+- **Live GPS tracking for `RECORRIDO` challenges**: point-by-point stream stored in Redis while a session is `ACTIVO` (`POST/GET .../sessions/{id}/points`); on `finish`, the distance traveled is computed with the Haversine formula and credited automatically as challenge progress through the same completion flow as `POST /challenges/{id}/progress`.
 - **In-process periodic job** (`APScheduler`, not `pg_cron` — unavailable on the Neon plan used) that expires overdue challenges every hour.
 
 ---
@@ -195,6 +196,7 @@ alembic upgrade head
 | Database        | PostgreSQL (Neon) + PostGIS                    |
 | Auth            | python-jose + passlib (own JWT, bcrypt)        |
 | Media Storage   | Cloudinary                                     |
+| Live Tracking   | Redis (GPS point-by-point stream for RECORRIDO challenges) |
 | Scheduling      | APScheduler (in-process, no `pg_cron`)         |
 | Testing         | pytest + httpx                                 |
 | Containerization| Docker + Docker Compose                        |
@@ -227,6 +229,7 @@ alembic upgrade head
    | `ALGORITHM` | JWT signing algorithm (`HS256` by default) |
    | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token validity in minutes (`60` by default). No refresh token yet — once it expires, the client must log in again |
    | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Cloudinary credentials (Dashboard → Account Details). **Required** — `app/config.py` has no default for these three, the app won't start without them |
+   | `REDIS_URL` | Redis connection string, used for the live GPS point tracking of `RECORRIDO` challenges. Defaults to `redis://redis:6379/0` (the Docker Compose service name) — only override it if you're running Redis somewhere else (see [Redis setup](#redis-setup) below) |
 
    `.env` is in `.gitignore` — it's never committed. `.env.example` is committed and **must not** contain real secrets.
 
@@ -237,6 +240,7 @@ docker compose up --build
 ```
 
 - The API becomes available at `http://localhost:8000`.
+- `docker-compose.yml` also starts a `redis` service (`redis:7-alpine`, with a named volume for persistence) — nothing else to configure, `REDIS_URL` already defaults to `redis://redis:6379/0`, which resolves to that service by its container name.
 - The container runs with `--reload` and the local code is mounted as a volume (`.:/app`): any change in your editor is reflected instantly, no image rebuild needed.
 - To stop it: `docker compose down`.
 - You only need to rebuild (`docker compose up --build`) when `requirements.txt` or the `Dockerfile` change.
@@ -249,9 +253,23 @@ source .venv/bin/activate        # on Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # if you don't have a .env yet: cp .env.example .env and fill it in (see "Setup" section)
+# make sure REDIS_URL points to a running Redis (see "Redis setup" below)
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+### Redis setup
+
+Only needed for the live GPS tracking of `RECORRIDO` challenges (`POST/GET .../sessions/{id}/points`) — the rest of the API works without it. Two options:
+
+- **Running with Docker** (recommended, zero extra steps): already covered above, the `redis` service in `docker-compose.yml` starts automatically with `docker compose up --build`.
+- **Running locally without Docker**: start a standalone Redis container just for this, no install needed:
+
+  ```bash
+  docker run -d --name tourpoints-redis -p 6379:6379 redis:7-alpine
+  ```
+
+  Then set `REDIS_URL=redis://localhost:6379/0` in your `.env` (already the default in `.env.example`). To confirm it's reachable: `docker exec tourpoints-redis redis-cli ping` should answer `PONG`.
 
 ---
 
@@ -315,7 +333,6 @@ Known pending work:
 
 - **Relationships between POIs** (`poi_relaciones` / `tipos_relacion_poi`) — the ORM model already exists (`app/models/poi.py`), the type catalog is already seeded (`app/scripts/seed_tipos_relacion_poi.py`), but there's **no router yet**.
 - **Conversational AI** (`conversaciones_ia`) — the ORM model already exists (`app/models/ia.py`, turn log with `session_id`, `modelo`, `tokens`, `costo_usd`, etc.), **no router yet**.
-- Live point-by-point tracking for `RECORRIDO`-type challenges, non-blocking (`sesiones_reto` only stores the start/end/status frame, no coordinates — the original design planned this with Redis, not yet implemented).
 
 `app/routers/promociones.py` is an unused empty file — don't confuse it with the real promotions module, which lives inside `comercial.py`/`comercial_service.py`.
 

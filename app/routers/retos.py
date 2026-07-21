@@ -1,6 +1,7 @@
 from typing import Optional, Tuple
 from uuid import UUID
 
+import redis
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,7 @@ from app.auth.dependencies import (
     get_optional_user,
     is_admin_user,
 )
+from app.core.redis_client import get_redis
 from app.database import get_db
 from app.models.usuario import Usuario
 from app.schemas.retos import (
@@ -22,9 +24,11 @@ from app.schemas.retos import (
     RetoDetail,
     RetoModeracion,
     RetoProgressUpdate,
+    SesionPuntoCreate,
     SesionRetoCreate,
     SesionRetoFinalizar,
     SesionRetoOut,
+    SesionTrackOut,
     UsuarioRetoOut,
 )
 from app.services.reto_service import RetoService
@@ -32,8 +36,10 @@ from app.services.reto_service import RetoService
 router = APIRouter(tags=["challenges"])
 
 
-def get_reto_service(db: Session = Depends(get_db)) -> RetoService:
-    return RetoService(db)
+def get_reto_service(
+    db: Session = Depends(get_db), redis_client: redis.Redis = Depends(get_redis)
+) -> RetoService:
+    return RetoService(db, redis_client)
 
 
 # --- Retos (plantillas) ---
@@ -176,6 +182,34 @@ def start_challenge_session(
     return service.crear_sesion(str(challenge_id), data, current_user)
 
 
+@router.post(
+    "/challenges/{challenge_id}/sessions/{session_id}/points", status_code=status.HTTP_204_NO_CONTENT
+)
+def add_challenge_session_point(
+    challenge_id: UUID,
+    session_id: UUID,
+    data: SesionPuntoCreate,
+    service: RetoService = Depends(get_reto_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Appends one GPS point to the session's live track in Redis. Call this
+    repeatedly (e.g. every few seconds) while the session is ACTIVO."""
+    service.agregar_punto(str(challenge_id), str(session_id), data, current_user)
+    return None
+
+
+@router.get("/challenges/{challenge_id}/sessions/{session_id}/points", response_model=SesionTrackOut)
+def get_challenge_session_points(
+    challenge_id: UUID,
+    session_id: UUID,
+    service: RetoService = Depends(get_reto_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Live track recorded so far for the session (points + cumulative distance),
+    read straight from Redis without persisting anything."""
+    return service.obtener_track(str(challenge_id), str(session_id), current_user)
+
+
 @router.patch("/challenges/{challenge_id}/sessions/{session_id}/finish", response_model=SesionRetoOut)
 def finish_challenge_session(
     challenge_id: UUID,
@@ -184,7 +218,9 @@ def finish_challenge_session(
     service: RetoService = Depends(get_reto_service),
     current_user: Usuario = Depends(get_current_user),
 ):
-    """Closes a tracking session."""
+    """Closes a tracking session, computes the distance traveled from the
+    recorded points, and automatically credits it as progress on the challenge
+    (same completion flow as POST /challenges/{id}/progress: points, streak, badges)."""
     return service.finalizar_sesion(str(challenge_id), str(session_id), data, current_user)
 
 

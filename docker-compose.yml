@@ -11,9 +11,23 @@ services:
       - .:/app
     user: root
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - redis
     networks:
       - default
       - npm_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: tourpoints_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - default
+
+volumes:
+  redis_data:
 
 networks:
   npm_network:

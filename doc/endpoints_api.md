@@ -701,14 +701,38 @@ Verificado end-to-end: reto `SIN_RECOMPENSA` completado en dos llamadas (50%→1
 `0`/`0` si nunca participaste. Verificado el caso de "hueco": si te uniste dejando pasar un periodo completo sin jugar, `racha_actual` vuelve a `0` en el siguiente `join` (no en el `progress`), mientras `racha_maxima` conserva el récord histórico.
 
 ### `POST /challenges/{id}/sessions` *(solo `tipo = RECORRIDO`)*
-Inicia una sesión de tracking en vivo (el stream punto-a-punto vive en Redis, fuera de esta API; esta tabla solo guarda el marco inicio/fin/estado). `422` si el reto no es `RECORRIDO`, `404` si `usuario_reto_id` no es tuyo o no es de este reto.
+Inicia una sesión de tracking en vivo (el stream punto-a-punto vive en Redis, fuera de esta tabla; acá solo se guarda el marco inicio/fin/estado). `422` si el reto no es `RECORRIDO`, `404` si `usuario_reto_id` no es tuyo o no es de este reto.
 ```json
 { "usuario_reto_id": "ur559a..." }
 ```
-Response `201`: `{"id": "ss11a...", "usuario_reto_id": "ur559a...", "inicio": "2026-07-14T16:40:00-05:00", "fin": null, "estado": "ACTIVO"}`.
+Response `201`: `{"id": "ss11a...", "usuario_reto_id": "ur559a...", "inicio": "2026-07-14T16:40:00-05:00", "fin": null, "estado": "ACTIVO", "distancia_metros": null}`.
+
+### `POST /challenges/{id}/sessions/{session_id}/points`
+Agrega **un** punto GPS al track de la sesión (`RPUSH` a la lista `session:points:{session_id}` en Redis, con TTL de seguridad de 24h). Pensado para llamarse repetidamente (cada pocos segundos) mientras la sesión está `ACTIVO`. `409` si la sesión ya está cerrada.
+```json
+{ "lat": 4.60971, "lng": -74.08175 }
+```
+Response `204`, sin body.
+
+### `GET /challenges/{id}/sessions/{session_id}/points`
+Lee el track en vivo directamente de Redis (no persiste nada) — pensado para pintar un mapa en tiempo real en el frontend.
+```json
+{
+  "puntos": [
+    { "lat": 4.60971, "lng": -74.08175, "ts": "2026-07-14T16:40:05-05:00" },
+    { "lat": 4.61020, "lng": -74.08175, "ts": "2026-07-14T16:40:12-05:00" }
+  ],
+  "distancia_metros": 54.9
+}
+```
 
 ### `PATCH /challenges/{id}/sessions/{session_id}/finish`
 Body opcional `{"estado": "FINALIZADO"}` (es el default). `409` si la sesión ya estaba cerrada.
+
+Cierra la sesión, lee todos los puntos guardados en Redis, calcula la distancia total (Haversine entre puntos consecutivos) y borra la key de Redis. **Esa distancia se acredita automáticamente como progreso del reto**, con el mismo camino interno que usa `POST /challenges/{id}/progress` (tope en `cantidad_requerida`, y si se completa: puntos + racha + hitos + canje) — el cliente ya no necesita llamar `/progress` a mano para `RECORRIDO`. Para este tipo de reto, `cantidad_requerida` se interpreta como **metros a recorrer**. Si el intento ya no está `ACTIVO` al momento del `finish` (por ejemplo se completó por otra vía), la sesión se cierra igual pero no se acredita progreso.
+```json
+{ "id": "ss11a...", "usuario_reto_id": "ur559a...", "inicio": "2026-07-14T16:40:00-05:00", "fin": "2026-07-14T16:52:30-05:00", "estado": "FINALIZADO", "distancia_metros": 612.4 }
+```
 
 ---
 

@@ -117,6 +117,7 @@ class SesionRetoOut(BaseModel):
     inicio: datetime
     fin: Optional[datetime] = None
     estado: RetoEstado
+    distancia_metros: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -124,6 +125,27 @@ class SesionRetoOut(BaseModel):
 
 class SesionRetoFinalizar(BaseModel):
     estado: str = "FINALIZADO"
+
+
+class SesionPuntoCreate(BaseModel):
+    """Body de POST /challenges/{id}/sessions/{session_id}/points. Un punto GPS por llamada."""
+
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
+
+
+class SesionPuntoOut(BaseModel):
+    lat: float
+    lng: float
+    ts: datetime
+
+
+class SesionTrackOut(BaseModel):
+    """Salida de GET /challenges/{id}/sessions/{session_id}/points: el track en vivo
+    almacenado en Redis y la distancia acumulada hasta el momento."""
+
+    puntos: List[SesionPuntoOut]
+    distancia_metros: float
 
 
 class RachaOut(BaseModel):

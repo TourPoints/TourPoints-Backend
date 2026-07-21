@@ -1,7 +1,9 @@
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
+import redis
 from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
@@ -27,11 +29,15 @@ from app.schemas.retos import (
     RetoListItem,
     RetoRecompensaMini,
     RetoProgressUpdate,
+    SesionPuntoCreate,
+    SesionPuntoOut,
     SesionRetoCreate,
     SesionRetoFinalizar,
     SesionRetoOut,
+    SesionTrackOut,
     UsuarioRetoOut,
 )
+from app.utils.geo import haversine_metros
 from app.utils.qr import generar_qr_canje
 
 # Igual que POI/establecimientos: BORRADOR nace cuando lo propone un
@@ -50,13 +56,18 @@ PUNTOS_RETO_POR_DEFECTO = 50
 # canjes por puntos en recompensas_service.py).
 VIGENCIA_CANJE_DIAS = 30
 
+# TTL de seguridad sobre el tracking en Redis de una sesión RECORRIDO: si el
+# cliente nunca llama a /finish, la key se autolimpia en vez de crecer para siempre.
+SESION_TRACK_TTL_SEGUNDOS = 60 * 60 * 24
+
 
 class RetoService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, redis_client: redis.Redis):
         self.db = db
         self.repository = RetoRepository(db)
         self.comercial_repo = ComercialRepository(db)
         self.movimiento_repo = MovimientoPuntosRepository(db)
+        self.redis = redis_client
 
     # --- Retos (plantillas) ---
 
@@ -317,11 +328,17 @@ class RetoService:
         if intento is None:
             raise RecordNotFoundError("No tienes un intento activo para este reto")
 
+        intento = self._aplicar_incremento(reto, intento, data.incremento, data.detalle, current_user)
+        return UsuarioRetoOut.model_validate(intento)
+
+    def _aplicar_incremento(self, reto: Reto, intento, incremento: int, detalle: Optional[str], current_user: Usuario):
+        """Cuerpo compartido por POST /challenges/{id}/progress y por el cierre de una
+        sesión RECORRIDO (la distancia recorrida se acredita con el mismo camino)."""
         progreso = dict(intento.progreso or {"completados": [], "cantidad": 0})
         completados = list(progreso.get("completados", []))
-        if data.detalle:
-            completados.append(data.detalle)
-        nueva_cantidad = min(progreso.get("cantidad", 0) + data.incremento, reto.cantidad_requerida)
+        if detalle:
+            completados.append(detalle)
+        nueva_cantidad = min(progreso.get("cantidad", 0) + incremento, reto.cantidad_requerida)
         porcentaje = int(nueva_cantidad / reto.cantidad_requerida * 100)
 
         cambios = {"progreso": {"completados": completados, "cantidad": nueva_cantidad}, "porcentaje": porcentaje}
@@ -335,7 +352,7 @@ class RetoService:
         if se_completa:
             self._al_completar(reto, intento, current_user)
 
-        return UsuarioRetoOut.model_validate(intento)
+        return intento
 
     def _puntos_para_reto(self, reto: Reto) -> "tuple[int, Optional[UUID]]":
         ahora = datetime.now(timezone.utc)
@@ -448,9 +465,7 @@ class RetoService:
         sesion = self.repository.crear_sesion({"usuario_reto_id": data.usuario_reto_id})
         return SesionRetoOut.model_validate(sesion)
 
-    def finalizar_sesion(
-        self, reto_id: str, sesion_id: str, data: SesionRetoFinalizar, current_user: Usuario
-    ) -> SesionRetoOut:
+    def _get_sesion_propia(self, reto_id: str, sesion_id: str, current_user: Usuario):
         sesion = self.repository.get_sesion(sesion_id)
         if sesion is None:
             raise RecordNotFoundError(f"Sesion with id {sesion_id} not found")
@@ -458,11 +473,61 @@ class RetoService:
         intento = self.repository.get_usuario_reto(str(sesion.usuario_reto_id))
         if intento is None or str(intento.usuario_id) != str(current_user.id) or str(intento.reto_id) != str(reto_id):
             raise RecordNotFoundError(f"Sesion with id {sesion_id} not found")
+        return sesion, intento
+
+    def _redis_key(self, sesion_id: str) -> str:
+        return f"session:points:{sesion_id}"
+
+    def _leer_puntos(self, sesion_id: str) -> list:
+        crudos = self.redis.lrange(self._redis_key(sesion_id), 0, -1)
+        return [json.loads(item) for item in crudos]
+
+    def _distancia_total(self, puntos: list) -> float:
+        total = 0.0
+        for anterior, actual in zip(puntos, puntos[1:]):
+            total += haversine_metros(anterior["lat"], anterior["lng"], actual["lat"], actual["lng"])
+        return total
+
+    def agregar_punto(
+        self, reto_id: str, sesion_id: str, data: SesionPuntoCreate, current_user: Usuario
+    ) -> None:
+        sesion, _ = self._get_sesion_propia(reto_id, sesion_id, current_user)
         if sesion.estado != RetoEstado.ACTIVO:
             raise ConflictError("Esta sesión ya está finalizada")
 
+        punto = {"lat": data.lat, "lng": data.lng, "ts": datetime.now(timezone.utc).isoformat()}
+        key = self._redis_key(sesion_id)
+        self.redis.rpush(key, json.dumps(punto))
+        self.redis.expire(key, SESION_TRACK_TTL_SEGUNDOS)
+
+    def obtener_track(self, reto_id: str, sesion_id: str, current_user: Usuario) -> SesionTrackOut:
+        self._get_sesion_propia(reto_id, sesion_id, current_user)
+        puntos = self._leer_puntos(sesion_id)
+        return SesionTrackOut(
+            puntos=[SesionPuntoOut(**punto) for punto in puntos],
+            distancia_metros=self._distancia_total(puntos),
+        )
+
+    def finalizar_sesion(
+        self, reto_id: str, sesion_id: str, data: SesionRetoFinalizar, current_user: Usuario
+    ) -> SesionRetoOut:
+        sesion, intento = self._get_sesion_propia(reto_id, sesion_id, current_user)
+        if sesion.estado != RetoEstado.ACTIVO:
+            raise ConflictError("Esta sesión ya está finalizada")
+
+        puntos = self._leer_puntos(sesion_id)
+        distancia_metros = self._distancia_total(puntos)
+
         sesion = self.repository.finalizar_sesion(sesion, data.estado, datetime.now(timezone.utc))
-        return SesionRetoOut.model_validate(sesion)
+        self.redis.delete(self._redis_key(sesion_id))
+
+        if distancia_metros > 0 and intento.estado == RetoEstado.ACTIVO:
+            reto = self.repository.get_by_id(reto_id)
+            self._aplicar_incremento(reto, intento, int(distancia_metros), None, current_user)
+
+        salida = SesionRetoOut.model_validate(sesion)
+        salida.distancia_metros = distancia_metros
+        return salida
 
     # --- Racha / insignias ---
 
