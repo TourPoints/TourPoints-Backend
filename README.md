@@ -1,8 +1,8 @@
 # 🗺️ TourPoints — Backend 🧑‍💻
 
-API del backend de **TourPoints**, una app de turismo gamificado: los usuarios descubren puntos de interés (POIs), los visitan, compran en negocios aliados y completan retos, todo lo cual otorga puntos canjeables por recompensas.
+Backend API for **TourPoints**, a gamified tourism app: users discover points of interest (POIs), visit them, shop at partner businesses, and complete challenges — all of which earns points redeemable for rewards.
 
-Este repositorio es **solo el backend**. El frontend vive en otro repositorio.
+This repository is **backend only**. The frontend lives in a separate repository.
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-API-009688)](https://fastapi.tiangolo.com/)
 [![Python](https://img.shields.io/badge/Python-3.12-blue)](https://www.python.org/)
@@ -33,60 +33,60 @@ Este repositorio es **solo el backend**. El frontend vive en otro repositorio.
 
 ## 📖 Project Overview
 
-Este proyecto corresponde al backend de una plataforma de turismo gamificado, desarrollado como parte del proyecto integrador del programa de Riwi.
+This project is the backend of a gamified tourism platform, built as part of the Riwi program's integrative project.
 
-El objetivo principal es aplicar:
+The main goal is to apply:
 
-- Arquitectura en capas (Router → Service → Repository → Model)
-- Modelado geoespacial con PostGIS
-- Autenticación y autorización con JWT
-- Reglas de negocio complejas (gamificación, ledger de puntos, moderación)
-- Buenas prácticas de backend con FastAPI y SQLAlchemy
+- Layered architecture (Router → Service → Repository → Model)
+- Geospatial modeling with PostGIS
+- Authentication and authorization with JWT
+- Complex business rules (gamification, points ledger, moderation)
+- Backend best practices with FastAPI and SQLAlchemy
 
-El sistema incluye:
+The system includes:
 
-- Autenticación y gestión de usuarios (con foto de perfil)
-- Catálogo geográfico (países, departamentos, ciudades) y categorías de POI
-- Gestión de puntos de interés (POI) con moderación e imágenes
-- Interacción social (calificaciones, comentarios, favoritos)
-- Check-in de visitas por GPS, QR o método mixto
-- Recompensas y canjes, incluida validación QR física en el punto de canje
-- Módulo comercial (establecimientos aliados, compras, promociones)
-- Módulo de retos (challenges, rachas, hitos, insignias)
-- Historial de puntos vía un ledger append-only
+- User authentication and management (with profile photo)
+- Geographic catalog (countries, departments, cities) and POI categories
+- Point-of-interest (POI) management with moderation and images
+- Social interaction (ratings, comments, favorites)
+- Visit check-in via GPS, QR, or a mixed method
+- Rewards and redemptions, including physical QR validation at the redemption point
+- Business module (partner establishments, purchases, promotions)
+- Challenges module (challenges, streaks, milestones, badges)
+- Points history via an append-only ledger
 
 ---
 
 ## ✨ Features
 
-### 🔐 Autenticación y Usuarios
-- Registro/login con JWT (`python-jose` + `passlib`)
+### 🔐 Authentication & Users
+- Register/login with JWT (`python-jose` + `passlib`)
 - Roles: `admin`, `usuario`, `establecimiento`
-- Perfil propio, cambio de contraseña, foto de perfil vía Cloudinary
+- Own profile, password change, profile photo via Cloudinary
 
-### 🗺️ POIs y Geolocalización
-- Ubicación con tipos geográficos PostGIS (`Geography(Point,4326)`)
-- Flujo de moderación (`BORRADOR` → `PENDIENTE` → `APROBADO`/`RECHAZADO`)
-- Imágenes múltiples por POI, con imagen principal
-- Código QR de check-in por POI (HMAC determinístico, sin almacenamiento en BD)
+### 🗺️ POIs & Geolocation
+- Location using PostGIS geographic types (`Geography(Point,4326)`)
+- Moderation flow (`BORRADOR` → `PENDIENTE` → `APROBADO`/`RECHAZADO`)
+- Multiple images per POI, with a primary image
+- Check-in QR code per POI (deterministic HMAC, no DB storage)
 
-### 🎮 Gamificación
-- Retos con recurrencia (única, diaria, semanal, mensual)
-- Rachas (streaks) con detección de gaps y hitos automáticos
-- Insignias otorgadas al alcanzar hitos de racha
-- Recompensas con modos `GARANTIZADA` / `LIMITADA`, canje por QR
+### 🎮 Gamification
+- Challenges with recurrence (one-time, daily, weekly, monthly)
+- Streaks with gap detection and automatic milestones
+- Badges awarded upon reaching streak milestones
+- Rewards with `GARANTIZADA` / `LIMITADA` modes, redeemable via QR
 
-### 🏪 Módulo Comercial
-- Establecimientos afiliados a un POI propio, con moderación
-- Registro de compras con acreditación automática de puntos
-- Reversión de compras vía movimiento compensatorio (nunca se edita el ledger)
-- Promociones con vigencia (`inicio`/`fin`) y moderación
+### 🏪 Business Module
+- Establishments affiliated with an owned POI, with moderation
+- Purchase logging with automatic points crediting
+- Purchase reversal via compensating entry (the ledger is never edited)
+- Promotions with validity window (`inicio`/`fin`) and moderation
 
-### 🧱 Arquitectura y Calidad
-- Separación estricta Router / Service / Repository / Model
-- Autorización por pertenencia real (`establecimiento_usuarios`), no solo por rol global
-- Excepciones de dominio con handlers HTTP centralizados
-- Documentación Swagger/OpenAPI en inglés, campos JSON en español (consistentes con la BD)
+### 🧱 Architecture & Quality
+- Strict Router / Service / Repository / Model separation
+- Authorization based on actual ownership (`establecimiento_usuarios`), not just global role
+- Domain exceptions with centralized HTTP handlers
+- Swagger/OpenAPI documentation in English, JSON fields in Spanish (consistent with the DB)
 
 ---
 
@@ -95,91 +95,91 @@ El sistema incluye:
 ```
 TourPoints-Backend/
 ├── app/
-│   ├── main.py              # arma la app FastAPI, monta routers bajo /api/v1, CORS, startup/shutdown
-│   ├── config.py            # Settings (pydantic-settings), lee .env
-│   ├── database.py          # engine, SessionLocal, Base declarativa, get_db()
-│   ├── auth/                 # JWT + hashing de password
-│   ├── core/                 # excepciones, handlers, middleware, scheduler
-│   ├── routers/               # 1 archivo por dominio: auth, catalogos, poi, social,
+│   ├── main.py              # builds the FastAPI app, mounts routers under /api/v1, CORS, startup/shutdown
+│   ├── config.py            # Settings (pydantic-settings), reads .env
+│   ├── database.py          # engine, SessionLocal, declarative Base, get_db()
+│   ├── auth/                 # JWT + password hashing
+│   ├── core/                 # exceptions, handlers, middleware, scheduler
+│   ├── routers/               # 1 file per domain: auth, catalogos, poi, social,
 │   │                          # usuarios, visitas, recompensas, canjes, comercial, retos, puntos
-│   ├── services/               # reglas de negocio, 1 archivo por dominio (espejo de routers)
-│   ├── repositories/           # acceso a datos SQLAlchemy, 1 archivo por dominio
+│   ├── services/               # business rules, 1 file per domain (mirrors routers)
+│   ├── repositories/           # SQLAlchemy data access, 1 file per domain
 │   ├── models/                 # ORM: usuario, poi, ubicacion, social, visita, comercial,
-│   │                          # gamificacion (retos/insignias/rachas), canje, movimiento_puntos, ia, enums
-│   ├── schemas/                 # DTOs Pydantic, request/response
+│   │                          # gamificacion (challenges/badges/streaks), canje, movimiento_puntos, ia, enums
+│   ├── schemas/                 # Pydantic DTOs, request/response
 │   ├── utils/                   # geo.py, qr.py, media.py
-│   └── scripts/                 # seeds idempotentes (roles, tipos_relacion_poi, insignias)
+│   └── scripts/                 # idempotent seeds (roles, tipos_relacion_poi, insignias)
 │
-├── alembic/                      # migraciones (env.py conectado a Base.metadata y DATABASE_URL)
-│   └── versions/                  # dd9d1878d96d (esquema inicial), 5e0ac9f7b8ed (poi_moderaciones)
+├── alembic/                      # migrations (env.py wired to Base.metadata and DATABASE_URL)
+│   └── versions/                  # dd9d1878d96d (initial schema), 5e0ac9f7b8ed (poi_moderaciones)
 │
-├── tests/                         # pytest — ver sección Tests, ⚠️ trunca la BD de DATABASE_URL
-├── doc/                            # documentación profunda (ver tabla en API Documentation)
-├── scripts/                        # smoke tests manuales fuera de la app (no seeds)
+├── tests/                         # pytest — see Tests section, ⚠️ truncates the DATABASE_URL database
+├── doc/                            # in-depth documentation (see table in API Documentation)
+├── scripts/                        # manual smoke tests outside the app (not seeds)
 ├── docker-compose.yml, Dockerfile
 ├── requirements.txt
 ├── alembic.ini
 └── .env.example
 ```
 
-> **Nota:** dos piezas del schema tienen modelo ORM pero **ningún endpoint todavía**: relaciones entre POIs (`poi_relaciones` / `tipos_relacion_poi`) e IA conversacional (`conversaciones_ia`). `app/routers/promociones.py` es un archivo vacío sin uso — las promociones reales se sirven desde `app/routers/comercial.py`. Detalle en [`doc/auth_usuarios_api.md`](doc/auth_usuarios_api.md).
+> **Note:** two pieces of the schema have an ORM model but **no endpoint yet**: relationships between POIs (`poi_relaciones` / `tipos_relacion_poi`) and conversational AI (`conversaciones_ia`). `app/routers/promociones.py` is an unused empty file — the real promotions are served from `app/routers/comercial.py`. Details in [`doc/auth_usuarios_api.md`](doc/auth_usuarios_api.md).
 
 ---
 
 ## 🏗️ Architecture
 
-El proyecto sigue una arquitectura en capas:
+The project follows a layered architecture:
 
 ```
 Router (FastAPI)  →  Service            →  Repository        →  Model (SQLAlchemy ORM)
    │                     │                      │
-   └─ Schema (Pydantic)  └─ reglas de negocio    └─ acceso a datos
-      valida request/       que la DB no            puro, sin
-      response HTTP         garantiza                lógica de negocio
+   └─ Schema (Pydantic)  └─ business rules       └─ pure data
+      validates HTTP        the DB doesn't          access, no
+      request/response      guarantee                business logic
 ```
 
-- **`app/routers/`** — endpoints HTTP, sin lógica de negocio.
-- **`app/services/`** — orquestan repositories y aplican reglas de negocio.
-- **`app/repositories/`** — acceso a datos con SQLAlchemy.
-- **`app/models/`** — mapeo ORM, un archivo por dominio (no por tabla).
-- **`app/schemas/`** — DTOs Pydantic para request/response.
-- **`app/auth/`** — `security.py` (hashing con bcrypt, JWT) y `dependencies.py` (`get_current_user`, `get_admin_user`, `get_optional_user`, etc.).
-- **`app/core/`** — `exceptions.py` + `exception_handlers.py` (excepciones de dominio y handlers HTTP), `scheduler.py` (job periódico in-process) y `middleware.py` (`JWTMiddleware`, que pese al nombre solo loguea cada request; la validación real del JWT vive en `app/auth/dependencies.py`).
-- **`app/utils/`** — `geo.py` (distancia GPS), `qr.py` (códigos de canje y check-in), `media.py` (validación de imágenes).
+- **`app/routers/`** — HTTP endpoints, no business logic.
+- **`app/services/`** — orchestrate repositories and apply business rules.
+- **`app/repositories/`** — data access with SQLAlchemy.
+- **`app/models/`** — ORM mapping, one file per domain (not per table).
+- **`app/schemas/`** — Pydantic DTOs for request/response.
+- **`app/auth/`** — `security.py` (bcrypt hashing, JWT) and `dependencies.py` (`get_current_user`, `get_admin_user`, `get_optional_user`, etc.).
+- **`app/core/`** — `exceptions.py` + `exception_handlers.py` (domain exceptions and their HTTP handlers), `scheduler.py` (in-process periodic job), and `middleware.py` (`JWTMiddleware`, which despite the name only logs each request; actual JWT validation lives in `app/auth/dependencies.py`).
+- **`app/utils/`** — `geo.py` (GPS distance), `qr.py` (redemption and check-in codes), `media.py` (image validation).
 
 ---
 
 ## ⚡ Business Logic & Security
 
-Puntos clave de la lógica de negocio implementada:
+Key points of the implemented business logic:
 
-- **Ledger append-only de puntos** (`movimientos_puntos`): nunca se edita ni se borra un movimiento; las reversiones (ej. cancelar una compra) se hacen con un movimiento negativo compensatorio.
-- **Autorización por pertenencia real**: endpoints como `POST /redemptions/validate-qr` verifican membresía en `establecimiento_usuarios`, no solo el rol global del token.
-- **Check-in de visitas** por GPS (distancia calculada con PostGIS `ST_DWithin`/`ST_Distance`), por QR (código HMAC determinístico por POI) o `MIXTA` (ambos a la vez).
-- **QR de canje vs. QR de check-in**: el de canje de recompensa usa un token aleatorio almacenado en BD; el de check-in de POI es determinístico (HMAC) y no requiere almacenamiento.
-- **Gamificación de retos**: cálculo de periodo según recurrencia, detección de gaps en la racha, otorgamiento automático de hitos/insignias, y un flujo de dos fases al completar un reto (los puntos/racha/hitos se confirman aunque el canje de recompensa `LIMITADA` falle por falta de stock).
-- **Job periódico in-process** (`APScheduler`, no `pg_cron` — no disponible en el plan de Neon usado) que expira retos vencidos cada hora.
+- **Append-only points ledger** (`movimientos_puntos`): an entry is never edited or deleted; reversals (e.g. canceling a purchase) are done with a compensating negative entry.
+- **Authorization by actual ownership**: endpoints like `POST /redemptions/validate-qr` verify membership in `establecimiento_usuarios`, not just the token's global role.
+- **Visit check-in** via GPS (distance computed with PostGIS `ST_DWithin`/`ST_Distance`), via QR (deterministic per-POI HMAC code), or `MIXTA` (both at once).
+- **Redemption QR vs. check-in QR**: reward redemption uses a random token stored in the DB; POI check-in is deterministic (HMAC) and requires no storage.
+- **Challenge gamification**: period calculation based on recurrence, streak gap detection, automatic milestone/badge awarding, and a two-phase flow on challenge completion (points/streak/milestones are confirmed even if a `LIMITADA` reward redemption fails due to stock).
+- **In-process periodic job** (`APScheduler`, not `pg_cron` — unavailable on the Neon plan used) that expires overdue challenges every hour.
 
 ---
 
 ## 🗄️ Database & Migrations
 
-- **PostgreSQL (Neon)** con extensión **PostGIS** habilitada (los POIs usan `Geography(Point,4326)`).
-- **Alembic** conectado a `Base.metadata` (`app/database.py`) y a `DATABASE_URL` (`app/config.py`).
+- **PostgreSQL (Neon)** with the **PostGIS** extension enabled (POIs use `Geography(Point,4326)`).
+- **Alembic** wired to `Base.metadata` (`app/database.py`) and `DATABASE_URL` (`app/config.py`).
 
-Migraciones aplicadas hoy en la base real:
+Migrations currently applied to the real database:
 
-1. `dd9d1878d96d` — esquema inicial (todas las tablas de [`doc/schem_posgrest.sql`](doc/schem_posgrest.sql)).
-2. `5e0ac9f7b8ed` — tabla de auditoría `poi_moderaciones`.
+1. `dd9d1878d96d` — initial schema (all tables from [`doc/schem_posgrest.sql`](doc/schem_posgrest.sql)).
+2. `5e0ac9f7b8ed` — `poi_moderaciones` audit table.
 
 ```bash
-alembic current        # ver el estado real de la base
+alembic current        # check the database's actual state
 ```
 
-Flujo normal para un cambio de schema (detallado con ejemplos en [`doc/guia_orm_alembic.md`](doc/guia_orm_alembic.md)):
+Normal workflow for a schema change (detailed with examples in [`doc/guia_orm_alembic.md`](doc/guia_orm_alembic.md)):
 
 ```bash
-alembic revision --autogenerate -m "descripción del cambio"
+alembic revision --autogenerate -m "change description"
 alembic upgrade head
 ```
 
@@ -187,15 +187,15 @@ alembic upgrade head
 
 ## 🛠️ Technologies
 
-| Category       | Technologies                                  |
-|-----------------|------------------------------------------------|
+| Category        | Technologies                                   |
+|-----------------|-------------------------------------------------|
 | Framework       | FastAPI                                        |
 | Language        | Python 3.12                                    |
 | ORM / Migrations| SQLAlchemy 2.x + Alembic                       |
 | Database        | PostgreSQL (Neon) + PostGIS                    |
-| Auth            | python-jose + passlib (JWT propio, bcrypt)     |
+| Auth            | python-jose + passlib (own JWT, bcrypt)        |
 | Media Storage   | Cloudinary                                     |
-| Scheduling      | APScheduler (in-process, sin `pg_cron`)        |
+| Scheduling      | APScheduler (in-process, no `pg_cron`)         |
 | Testing         | pytest + httpx                                 |
 | Containerization| Docker + Docker Compose                        |
 
@@ -203,52 +203,52 @@ alembic upgrade head
 
 ## 🚀 How to Run
 
-### Requisitos previos
+### Prerequisites
 
-- Docker y Docker Compose (para correrlo en contenedor), **o** Python 3.12 (para correrlo local sin Docker).
-- Acceso a una base de datos PostgreSQL con PostGIS habilitado (se usa Neon en este proyecto).
+- Docker and Docker Compose (to run it in a container), **or** Python 3.12 (to run it locally without Docker).
+- Access to a PostgreSQL database with PostGIS enabled (this project uses Neon).
 
-### Configuración
+### Setup
 
-1. Si es la primera vez que clonas el repo (todavía no tienes `.env`), copia la plantilla:
+1. If this is your first time cloning the repo (you don't have a `.env` yet), copy the template:
 
    ```bash
    cp .env.example .env
    ```
 
-   ⚠️ Si ya tienes un `.env` con credenciales reales, **no** ejecutes esto — lo sobrescribirías.
+   ⚠️ If you already have a `.env` with real credentials, **do not** run this — it would overwrite them.
 
-2. Completa `.env` con tus valores reales:
+2. Fill in `.env` with your real values:
 
-   | Variable | Descripción |
+   | Variable | Description |
    |---|---|
-   | `DATABASE_URL` | Connection string de Postgres (Neon → Dashboard → Connection Details) |
-   | `SECRET_KEY` | Clave para firmar los JWT. Genera una propia: `openssl rand -hex 32` — **nunca reutilices la del ejemplo** |
-   | `ALGORITHM` | Algoritmo de firma del JWT (`HS256` por defecto) |
-   | `ACCESS_TOKEN_EXPIRE_MINUTES` | Minutos de validez del token (`60` por defecto). No hay refresh token todavía — al expirar, el cliente debe volver a hacer login |
-   | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Credenciales de Cloudinary (Dashboard → Account Details). **Obligatorias** — `app/config.py` no tiene default para estas tres, la app no arranca sin ellas |
+   | `DATABASE_URL` | Postgres connection string (Neon → Dashboard → Connection Details) |
+   | `SECRET_KEY` | Key used to sign JWTs. Generate your own: `openssl rand -hex 32` — **never reuse the example value** |
+   | `ALGORITHM` | JWT signing algorithm (`HS256` by default) |
+   | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token validity in minutes (`60` by default). No refresh token yet — once it expires, the client must log in again |
+   | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Cloudinary credentials (Dashboard → Account Details). **Required** — `app/config.py` has no default for these three, the app won't start without them |
 
-   `.env` está en `.gitignore` — nunca se commitea. `.env.example` sí se commitea y **no** debe tener secretos reales.
+   `.env` is in `.gitignore` — it's never committed. `.env.example` is committed and **must not** contain real secrets.
 
-### Con Docker (recomendado)
+### With Docker (recommended)
 
 ```bash
 docker compose up --build
 ```
 
-- La API queda disponible en `http://localhost:8000`.
-- El contenedor corre con `--reload` y el código local está montado como volumen (`.:/app`): cualquier cambio en tu editor se refleja al instante, sin reconstruir la imagen.
-- Para detenerlo: `docker compose down`.
-- Solo hace falta reconstruir (`docker compose up --build`) cuando cambian `requirements.txt` o el `Dockerfile`.
+- The API becomes available at `http://localhost:8000`.
+- The container runs with `--reload` and the local code is mounted as a volume (`.:/app`): any change in your editor is reflected instantly, no image rebuild needed.
+- To stop it: `docker compose down`.
+- You only need to rebuild (`docker compose up --build`) when `requirements.txt` or the `Dockerfile` change.
 
-### Sin Docker (local)
+### Without Docker (local)
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate        # en Windows: .venv\Scripts\activate
+source .venv/bin/activate        # on Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# si no tienes .env todavía: cp .env.example .env y complétalo (ver sección "Configuración")
+# if you don't have a .env yet: cp .env.example .env and fill it in (see "Setup" section)
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -257,39 +257,39 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## 📚 API Documentation
 
-Con la app corriendo (por cualquiera de los dos métodos):
+With the app running (either method above):
 
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 - Health check: `http://localhost:8000/health`
 
-Todas las rutas de negocio cuelgan del prefijo `/api/v1`. Cómo se monta cada router en [`app/main.py`](app/main.py):
+All business routes hang off the `/api/v1` prefix. How each router is mounted in [`app/main.py`](app/main.py):
 
-| Router | Prefijo | Tag | Paths de ejemplo |
+| Router | Prefix | Tag | Example Paths |
 |---|---|---|---|
 | `auth.py` | `/auth` | `auth` | `/register`, `/login` |
-| `catalogos.py` | *(ninguno)* | `catalogs` | `/countries`, `/departments`, `/cities`, `/poi-categories` |
+| `catalogos.py` | *(none)* | `catalogs` | `/countries`, `/departments`, `/cities`, `/poi-categories` |
 | `poi.py` | `/poi` | `poi` | `/`, `/{poi_id}`, `/{poi_id}/checkin` |
-| `social.py` | *(ninguno)* | `social` | `/poi/{poi_id}/my-rating`, `/favorites`, `/comments/{id}` |
+| `social.py` | *(none)* | `social` | `/poi/{poi_id}/my-rating`, `/favorites`, `/comments/{id}` |
 | `usuarios.py` | `/users` | `users` | `/me`, `/me/photo` |
-| `visitas.py` | `/visits` | *(sin tag)* | `/`, `/me`, `/me/balance` |
-| `recompensas.py` | `/rewards` | `rewards` | listado y gestión de recompensas |
-| `canjes.py` | `/redemptions` | `redemptions` | canje y validación QR física |
-| `comercial.py` | *(ninguno)* | `businesses` | `/businesses`, `/businesses/{id}/purchases`, `/poi/{poi_id}/promotions` |
-| `retos.py` | *(ninguno)* | `challenges` | `/challenges`, `/challenges/{id}/join`, `/users/me/badges` |
-| `puntos.py` | `/points` | *(sin tag)* | `/me/movements` |
+| `visitas.py` | `/visits` | *(no tag)* | `/`, `/me`, `/me/balance` |
+| `recompensas.py` | `/rewards` | `rewards` | listing and managing rewards |
+| `canjes.py` | `/redemptions` | `redemptions` | redemption and physical QR validation |
+| `comercial.py` | *(none)* | `businesses` | `/businesses`, `/businesses/{id}/purchases`, `/poi/{poi_id}/promotions` |
+| `retos.py` | *(none)* | `challenges` | `/challenges`, `/challenges/{id}/join`, `/users/me/badges` |
+| `puntos.py` | `/points` | *(no tag)* | `/me/movements` |
 
-Los routers sin prefijo declaran el path completo dentro de cada `@router.get/post/...`. El contrato completo, campo por campo, está en [`doc/endpoints_api.md`](doc/endpoints_api.md).
+Routers without a prefix declare the full path inside each `@router.get/post/...`. The full contract, field by field, is in [`doc/endpoints_api.md`](doc/endpoints_api.md).
 
-Documentación más profunda en `doc/`:
+More in-depth documentation in `doc/`:
 
-| Archivo | Qué cubre |
+| File | What it covers |
 |---|---|
-| [`doc/endpoints_api.md`](doc/endpoints_api.md) | **Contrato completo de la API** — todos los endpoints implementados, con auth, body, response real y notas de qué difiere del diseño original. |
-| [`doc/auth_usuarios_api.md`](doc/auth_usuarios_api.md) | Detalle fino de `/auth` y `/users` (claims del JWT, reglas de cada campo, cobertura de tests). |
-| [`doc/logica_negocio.md`](doc/logica_negocio.md) | Qué hace cada tabla, qué invariantes garantiza la base de datos (`CHECK`s, triggers, columnas generadas) y cómo fluyen los procesos de negocio de punta a punta. |
-| [`doc/schem_posgrest.sql`](doc/schem_posgrest.sql) | El DDL completo de referencia (33 tablas, triggers, vistas). |
-| [`doc/guia_orm_alembic.md`](doc/guia_orm_alembic.md) | Cómo trabajar con SQLAlchemy + Alembic en este proyecto: comandos, flujo para modificar el schema, errores comunes. |
+| [`doc/endpoints_api.md`](doc/endpoints_api.md) | **Full API contract** — every implemented endpoint, with auth, body, actual response, and notes on what differs from the original design. |
+| [`doc/auth_usuarios_api.md`](doc/auth_usuarios_api.md) | Fine detail on `/auth` and `/users` (JWT claims, per-field rules, test coverage). |
+| [`doc/logica_negocio.md`](doc/logica_negocio.md) | What each table does, what invariants the database guarantees (`CHECK`s, triggers, generated columns), and how business processes flow end to end. |
+| [`doc/schem_posgrest.sql`](doc/schem_posgrest.sql) | The full reference DDL (33 tables, triggers, views). |
+| [`doc/guia_orm_alembic.md`](doc/guia_orm_alembic.md) | How to work with SQLAlchemy + Alembic in this project: commands, workflow for schema changes, common errors. |
 
 ---
 
@@ -299,36 +299,48 @@ Documentación más profunda en `doc/`:
 pytest
 ```
 
-(requiere tener el entorno virtual activado y las dependencias instaladas, ver sección "Sin Docker" arriba)
+(requires the virtual environment activated and dependencies installed, see the "Without Docker" section above)
 
-⚠️ **`pytest` borra todos los datos de la base configurada en `DATABASE_URL`.** No hay una base de test separada — la suite corre contra la misma Neon real de `.env`. El fixture `_schema` (session-scoped, autouse, en `tests/conftest.py`) ejecuta `TRUNCATE {tabla} CASCADE` sobre **las 33 tablas del schema, una sola vez al arrancar la sesión de tests**, antes de que corra un solo test. Después de ese truncado inicial, cada test individual sí queda aislado (el fixture `db` corre dentro de una transacción con `rollback()` al final) — pero ese primer `TRUNCATE` es real e irreversible. **Nunca corras `pytest` apuntando `DATABASE_URL` a una base con datos que te importen.** Usá una base descartable (una branch de Neon, por ejemplo) — nunca la de desarrollo compartida.
+⚠️ **`pytest` deletes all data in the database configured in `DATABASE_URL`.** There is no separate test database — the suite runs against the same real Neon database from `.env`. The `_schema` fixture (session-scoped, autouse, in `tests/conftest.py`) runs `TRUNCATE {table} CASCADE` on **all 33 tables in the schema, once when the test session starts**, before a single test runs. After that initial truncate, each individual test is isolated (the `db` fixture runs inside a transaction with `rollback()` at the end) — but that first `TRUNCATE` is real and irreversible. **Never run `pytest` pointing `DATABASE_URL` at a database with data you care about.** Use a disposable database (a Neon branch, for example) — never the shared development one.
 
 ---
 
 ## 📊 Project Status
 
-Todos los módulos de negocio del diseño original están implementados y probados end-to-end contra la base real: catálogos (países/departamentos/ciudades/categorías), POI (con moderación, imágenes y check-in QR), usuarios (con foto de perfil), social (calificaciones/comentarios/favoritos), visitas (GPS/QR/MIXTA), recompensas y canjes (con validación QR física), comercial (establecimientos/compras/promociones, con autorización real por pertenencia), retos (plantillas, inscripción, progreso, rachas, hitos, insignias) y puntos (historial del ledger).
+All business modules from the original design are implemented and tested end-to-end against the real database: catalogs (countries/departments/cities/categories), POI (with moderation, images, and QR check-in), users (with profile photo), social (ratings/comments/favorites), visits (GPS/QR/MIXTA), rewards and redemptions (with physical QR validation), business (establishments/purchases/promotions, with real ownership-based authorization), challenges (templates, enrollment, progress, streaks, milestones, badges), and points (ledger history).
 
-El detalle endpoint por endpoint, incluidas las decisiones que no estaban en el diseño original y los gaps conocidos, vive en [`doc/endpoints_api.md`](doc/endpoints_api.md) — ese documento es la fuente de verdad más actualizada, más que este README.
+The endpoint-by-endpoint detail, including decisions not in the original design and known gaps, lives in [`doc/endpoints_api.md`](doc/endpoints_api.md) — that document is the most up-to-date source of truth, more so than this README.
 
-Pendiente conocido:
+Known pending work:
 
-- **Relaciones entre POIs** (`poi_relaciones` / `tipos_relacion_poi`) — modelo ORM ya existe (`app/models/poi.py`), catálogo de tipos ya sembrado (`app/scripts/seed_tipos_relacion_poi.py`), pero **sin router todavía**.
-- **IA conversacional** (`conversaciones_ia`) — modelo ORM ya existe (`app/models/ia.py`, log de turnos con `session_id`, `modelo`, `tokens`, `costo_usd`, etc.), **sin router todavía**.
-- Tracking punto-a-punto en vivo de los retos tipo `RECORRIDO`, no bloqueante (`sesiones_reto` solo guarda el marco inicio/fin/estado, sin coordenadas — el diseño original lo pensaba con Redis, todavía no implementado).
+- **Relationships between POIs** (`poi_relaciones` / `tipos_relacion_poi`) — the ORM model already exists (`app/models/poi.py`), the type catalog is already seeded (`app/scripts/seed_tipos_relacion_poi.py`), but there's **no router yet**.
+- **Conversational AI** (`conversaciones_ia`) — the ORM model already exists (`app/models/ia.py`, turn log with `session_id`, `modelo`, `tokens`, `costo_usd`, etc.), **no router yet**.
+- Live point-by-point tracking for `RECORRIDO`-type challenges, non-blocking (`sesiones_reto` only stores the start/end/status frame, no coordinates — the original design planned this with Redis, not yet implemented).
 
-`app/routers/promociones.py` es un archivo vacío sin uso — no confundir con el módulo de promociones real, que vive dentro de `comercial.py`/`comercial_service.py`.
+`app/routers/promociones.py` is an unused empty file — don't confuse it with the real promotions module, which lives inside `comercial.py`/`comercial_service.py`.
 
 ---
 
 ## 🎯 Academic Objectives
 
-Este proyecto cumple con:
+This project fulfills:
 
-✔ Arquitectura en capas (Router → Service → Repository → Model)
-✔ Modelado geoespacial con PostGIS
-✔ Autenticación y autorización con JWT
-✔ Diseño de un sistema de gamificación completo (retos, rachas, insignias, puntos)
-✔ Migraciones versionadas con Alembic
-✔ Buenas prácticas de backend con FastAPI
-✔ Documentación técnica completa (API, lógica de negocio, esquema de base de datos)
+✔ Layered architecture (Router → Service → Repository → Model)
+✔ Geospatial modeling with PostGIS
+✔ Authentication and authorization with JWT
+✔ Design of a complete gamification system (challenges, streaks, badges, points)
+✔ Versioned migrations with Alembic
+✔ Backend best practices with FastAPI
+✔ Complete technical documentation (API, business logic, database schema)
+
+---
+
+## 👨‍💻 Author
+
+**Juan Andrés Henríquez**
+Developer Riwi
+Clan Cortissoz
+
+---
+
+💡 *"A backend shouldn't just work — it should correctly model the business rules."*
