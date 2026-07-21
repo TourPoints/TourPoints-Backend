@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth.security import authenticate_user, create_access_token, hash_password
 from app.core.exceptions import CredentialsException
+from app.core.rate_limit import limiter
 from app.database import get_db
 from app.models.usuario import Rol, Usuario
 from app.schemas.usuario import Token, UsuarioCreate, UsuarioLogin, UsuarioResponse
@@ -11,7 +12,8 @@ router = APIRouter(tags=["auth"])
 
 
 @router.post("/register", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
-def register_user(usuario: UsuarioCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register_user(request: Request, usuario: UsuarioCreate, db: Session = Depends(get_db)):
     """Registers a new user with the default role and a hashed password."""
     existing_user = db.query(Usuario).filter(Usuario.email == usuario.email).first()
     if existing_user:
@@ -34,7 +36,8 @@ def register_user(usuario: UsuarioCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login_user(usuario: UsuarioLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login_user(request: Request, usuario: UsuarioLogin, db: Session = Depends(get_db)):
     """Authenticates the user and returns a JWT access token."""
     db_user = db.query(Usuario).filter(Usuario.email == usuario.email).filter(Usuario.deleted_at.is_(None)).first()
     if not db_user:

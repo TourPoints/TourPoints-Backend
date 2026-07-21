@@ -31,12 +31,15 @@ class RecordNotFoundErrorHandler(BaseExceptionHandler):
 
 class DBErrorHandler(BaseExceptionHandler):
     def handle(self, request: Request, exc: DBError) -> JSONResponse:
-        logging.error(f"DBError: {exc}")
+        # exc.detail suele incluir el texto crudo de la excepción de SQLAlchemy
+        # (nombres de tabla/columna, fragmentos de la query) — se loguea acá
+        # para diagnóstico, pero nunca se devuelve al cliente.
+        logging.error(f"DBError: {exc.detail}")
         return JSONResponse(
             status_code=500,
             content={
                 "details": "Database error occurred",
-                "error": exc.detail
+                "error": "Ocurrió un error interno al procesar la solicitud"
             }
         )
 
