@@ -1,5 +1,214 @@
-from fastapi import APIRouter
+from typing import Optional
 
-router = APIRouter()
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy.orm import Session
 
-# TODO: GET /me, GET /me/puntos, GET /me/canjes (ver mvp_backend.md)
+from app.auth.dependencies import get_admin_user, get_current_user
+from app.auth.security import hash_password, verify_password
+from app.database import get_db
+from app.models.usuario import Usuario
+from app.repositories.usuario_repository import UsuarioRepository
+from app.schemas.usuario import PaginatedUsuariosResponse, UsuarioCreate, UsuarioResponse
+from app.schemas.usuarios import ChangePasswordRequest, UsuarioUpdate
+from app.services.usuario_service import UsuarioService
+
+router = APIRouter(tags=["users"])
+
+
+def get_user_service(db: Session = Depends(get_db)) -> UsuarioService:
+    repository = UsuarioRepository(db)
+    return UsuarioService(repository)
+
+
+@router.post("", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
+def create_user(
+    user_data: UsuarioCreate,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Creates a new user (admin only)."""
+    return service.create_user(user_data)
+
+
+@router.get("", response_model=PaginatedUsuariosResponse)
+def list_users(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    name: Optional[str] = Query(None, description="Filter by first name"),
+    surname: Optional[str] = Query(None, description="Filter by last name"),
+    email: Optional[str] = Query(None, description="Filter by email"),
+    estado: Optional[str] = Query(None, description="Filter by status"),
+    rol_id: Optional[int] = Query(None, description="Filter by role"),
+    include_deleted: bool = Query(False, description="Include deleted users"),
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Lists users with pagination and optional filters."""
+    filters = {}
+    if name:
+        filters["nombre"] = name
+    if surname:
+        filters["apellido"] = surname
+    if email:
+        filters["email"] = email
+    if estado:
+        filters["estado"] = estado
+    if rol_id:
+        filters["rol_id"] = rol_id
+    if include_deleted:
+        filters["include_deleted"] = True
+
+    skip = (page - 1) * page_size
+    items = service.list_users(skip=skip, limit=page_size, **filters)
+    total = service.count_users(**filters)
+    return PaginatedUsuariosResponse(items=items, total=total, page=page, page_size=page_size)
+
+
+@router.get("/count", response_model=int)
+def count_users(
+    name: Optional[str] = Query(None),
+    surname: Optional[str] = Query(None),
+    email: Optional[str] = Query(None),
+    estado: Optional[str] = Query(None),
+    rol_id: Optional[int] = Query(None),
+    include_deleted: bool = Query(False),
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Counts users with optional filters."""
+    filters = {}
+    if name:
+        filters["nombre"] = name
+    if surname:
+        filters["apellido"] = surname
+    if email:
+        filters["email"] = email
+    if estado:
+        filters["estado"] = estado
+    if rol_id:
+        filters["rol_id"] = rol_id
+    if include_deleted:
+        filters["include_deleted"] = True
+
+    return service.count_users(**filters)
+
+
+@router.get("/me", response_model=UsuarioResponse)
+def get_current_user_profile(current_user: Usuario = Depends(get_current_user)):
+    """Returns the authenticated user's profile."""
+    return current_user
+
+
+@router.patch("/me", response_model=UsuarioResponse)
+def update_current_user_profile(
+    user_data: UsuarioUpdate,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Updates the authenticated user's profile."""
+    update_data = user_data.model_dump(exclude_unset=True)
+    update_data.pop("rol_id", None)  # el rol solo puede cambiarlo un admin vía PATCH /users/{id}
+    if "email" in update_data:
+        existing_user = db.query(Usuario).filter(Usuario.email == update_data["email"]).first()
+        if existing_user and existing_user.id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El email ya está registrado")
+
+    if "password" in update_data:
+        update_data["password_hash"] = hash_password(update_data["password"])
+        del update_data["password"]
+
+    for field, value in update_data.items():
+        if hasattr(current_user, field):
+            setattr(current_user, field, value)
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_current_user_password(
+    password_data: ChangePasswordRequest,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Changes the authenticated user's password."""
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña actual es incorrecta")
+
+    current_user.password_hash = hash_password(password_data.new_password)
+    db.commit()
+    return None
+
+
+@router.post("/me/photo", response_model=UsuarioResponse)
+def upload_current_user_photo(
+    file: UploadFile = File(...),
+    service: UsuarioService = Depends(get_user_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Uploads/replaces the authenticated user's profile photo. multipart/form-data: `file`
+    (image/jpeg, image/png or image/webp)."""
+    return service.upload_foto(str(current_user.id), file)
+
+
+@router.delete("/me/photo", response_model=UsuarioResponse)
+def delete_current_user_photo(
+    service: UsuarioService = Depends(get_user_service),
+    current_user: Usuario = Depends(get_current_user),
+):
+    """Removes the authenticated user's profile photo (deletes the Cloudinary asset and clears foto_url)."""
+    return service.delete_foto(str(current_user.id))
+
+
+@router.post("/{user_id}/activate", response_model=UsuarioResponse)
+def activate_user(
+    user_id: str,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Activates a suspended or deleted user."""
+    return service.activate_user(user_id)
+
+
+@router.post("/{user_id}/suspend", response_model=UsuarioResponse)
+def suspend_user(
+    user_id: str,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Suspends an active user."""
+    return service.suspend_user(user_id)
+
+
+@router.get("/{user_id}", response_model=UsuarioResponse)
+def get_user(
+    user_id: str,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Gets a user by ID."""
+    return service.get_user(user_id)
+
+
+@router.patch("/{user_id}", response_model=UsuarioResponse)
+def update_user(
+    user_id: str,
+    user_data: UsuarioUpdate,
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Updates an existing user (partial update)."""
+    return service.update_user(user_id, user_data)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: str,
+    soft: bool = Query(True, description="Soft delete (true) or permanent delete (false)"),
+    service: UsuarioService = Depends(get_user_service),
+    admin_user: Usuario = Depends(get_admin_user),
+):
+    """Deletes a user (soft delete by default)."""
+    service.delete_user(user_id, soft=soft)
+    return None

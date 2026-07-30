@@ -10,3 +10,5 @@ __pycache__/
 
 # Base de datos local de desarrollo
 *.db
+
+graphify-out
